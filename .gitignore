@@ -1,0 +1,32 @@
+.DS_Store
+
+# Node / package managers
+node_modules/
+.pnpm-store/
+
+# Build output
+.next/
+dist/
+build/
+coverage/
+.turbo/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE / editor
+.idea/
+.vscode/
+
+# Local worktrees
+.worktrees/
+worktrees/
