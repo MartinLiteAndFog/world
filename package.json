@@ -1,0 +1,18 @@
+{
+  "name": "street-stocks",
+  "private": true,
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "dev:api": "pnpm --filter @street-stocks/api dev",
+    "dev:web": "pnpm --filter @street-stocks/web dev",
+    "jobs:seed": "pnpm --filter @street-stocks/jobs jobs:seed",
+    "jobs:score": "pnpm --filter @street-stocks/jobs jobs:score"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.8",
+    "typescript": "^5.9.2"
+  }
+}

@@ -1,0 +1,4 @@
+- `pnpm dev:api`
+- `pnpm dev:web`
+- `pnpm jobs:seed`
+- `pnpm jobs:score`

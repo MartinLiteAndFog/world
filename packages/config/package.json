@@ -1,0 +1,9 @@
+{
+  "name": "@street-stocks/config",
+  "private": true,
+  "scripts": {
+    "build": "node -e \"console.log('Config scaffold ready')\"",
+    "lint": "node -e \"console.log('No config lint rules yet')\"",
+    "test": "node -e \"console.log('No config tests yet')\""
+  }
+}

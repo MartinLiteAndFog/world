@@ -1,0 +1,11 @@
+{
+  "name": "@street-stocks/jobs",
+  "private": true,
+  "scripts": {
+    "build": "node -e \"console.log('Jobs build scaffold ready')\"",
+    "jobs:seed": "node -e \"console.log('Seed job not implemented yet')\"",
+    "jobs:score": "node -e \"console.log('Score job not implemented yet')\"",
+    "lint": "node -e \"console.log('No jobs lint rules yet')\"",
+    "test": "node -e \"console.log('No jobs tests yet')\""
+  }
+}
