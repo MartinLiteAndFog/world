@@ -16,7 +16,9 @@ describe("business query api", () => {
 
   beforeAll(async () => {
     await prepareIsolatedTestDatabase(databaseName);
-    await runSeedCommand();
+    await runSeedCommand({
+      citySlugs: ["new-york", "berlin", "london"]
+    });
     await runNormalizeCommand();
     await runScoreCommand();
 
@@ -48,6 +50,7 @@ describe("business query api", () => {
     expect(response.statusCode).toBe(200);
     expect(body.items[0]).toHaveProperty("businessValueScore");
     expect(body.items[0]).not.toHaveProperty("payloadJson");
+    expect(body.meta.totalItems).toBeGreaterThan(0);
   });
 
   it("GET /businesses/:id returns one business with location and scorecard", async () => {
@@ -81,5 +84,40 @@ describe("business query api", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:3000");
+  });
+
+  it("filters viewport results by city, category, and text query", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/businesses?bbox=13.35,52.48,13.45,52.55&city=Berlin&category=cafe&q=brew"
+    });
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0].canonicalName).toBe("Berlin Brew");
+    expect(body.items[0].locality).toBe("Berlin");
+    expect(body.items[0].category).toBe("cafe");
+    expect(body.meta.appliedFilters).toEqual({
+      category: "cafe",
+      city: "Berlin",
+      q: "brew"
+    });
+  });
+
+  it("lists curated cities from persisted businesses", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/cities"
+    });
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(body.items.map((item: { locality: string }) => item.locality)).toEqual([
+      "Berlin",
+      "London",
+      "New York"
+    ]);
+    expect(body.items[0]).toHaveProperty("businessCount");
   });
 });

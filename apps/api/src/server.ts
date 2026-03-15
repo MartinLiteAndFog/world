@@ -4,6 +4,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { getAllowedWebOrigins, getApiPort } from "./lib/env.js";
 import { registerBusinessDetailRoutes } from "./routes/business-detail.js";
 import { registerBusinessesRoutes } from "./routes/businesses.js";
+import { registerCitiesRoutes } from "./routes/cities.js";
 import { registerHealthRoutes } from "./routes/health.js";
 
 export function buildServer(): FastifyInstance {
@@ -31,6 +32,7 @@ export function buildServer(): FastifyInstance {
 
   void registerHealthRoutes(app);
   void registerBusinessesRoutes(app);
+  void registerCitiesRoutes(app);
   void registerBusinessDetailRoutes(app);
 
   return app;

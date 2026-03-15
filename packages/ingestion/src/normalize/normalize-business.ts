@@ -42,6 +42,20 @@ type NormalizableFields = {
   payload: Record<string, unknown> | null;
 };
 
+function normalizeSourceCategory(sourceCategory: string): string {
+  const normalized = sourceCategory.trim().toLowerCase();
+
+  if (normalized === "coffee_shop") {
+    return "cafe";
+  }
+
+  if (normalized === "pub") {
+    return "bar";
+  }
+
+  return normalized;
+}
+
 export type PersistedRawNormalizationRecord = {
   id: string;
   source_name: string;
@@ -154,7 +168,7 @@ function buildNormalizedBusinessRecord(
   const business = createBusinessEntity({
     id: businessId,
     canonicalName: record.canonicalNameHint,
-    category: record.sourceCategory
+    category: normalizeSourceCategory(record.sourceCategory)
   });
 
   const location = createLocation({

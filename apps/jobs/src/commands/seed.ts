@@ -4,14 +4,18 @@ import {
   buildSeedDataset,
 } from "@street-stocks/ingestion";
 
-export async function runSeedCommand(): Promise<void> {
+export type SeedCommandOptions = {
+  citySlugs?: ("new-york" | "berlin" | "london")[];
+};
+
+export async function runSeedCommand(options: SeedCommandOptions = {}): Promise<void> {
   const pool = getPool();
   const client = await pool.connect();
 
   try {
     await client.query("BEGIN");
 
-    for (const seedRecord of buildSeedDataset()) {
+    for (const seedRecord of buildSeedDataset({ citySlugs: options.citySlugs })) {
       const policyApplied = applyStoragePolicy(seedRecord);
       await client.query(
         `
@@ -52,7 +56,9 @@ export async function runSeedCommand(): Promise<void> {
     }
 
     await client.query("COMMIT");
-    console.log("Seeded raw source records");
+    console.log("Seeded raw source records", {
+      citySlugs: options.citySlugs ?? ["new-york"]
+    });
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

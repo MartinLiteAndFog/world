@@ -17,6 +17,7 @@ export function applyStoragePolicy(record: SeedSourceRecord): PolicyAppliedSourc
     retentionClass: "rolling_30d",
     attributionText: "OpenStreetMap contributors",
     referenceSnapshot: {
+      citySlug: record.citySlug,
       canonicalNameHint: record.canonicalNameHint,
       displayName: record.displayName,
       sourceCategory: record.sourceCategory,

@@ -9,8 +9,10 @@
     "dev:api": "pnpm --filter @street-stocks/api dev",
     "dev:web": "pnpm --filter @street-stocks/web dev",
     "dev:up": "./scripts/dev-up.sh",
+    "dev:up:demo": "./scripts/dev-up.sh new-york berlin london",
     "reset-db": "./scripts/reset-db.sh",
     "jobs:seed": "pnpm --filter @street-stocks/jobs jobs:seed && pnpm --filter @street-stocks/jobs jobs:normalize",
+    "jobs:seed:demo": "pnpm --filter @street-stocks/jobs jobs:seed --city=new-york --city=berlin --city=london && pnpm --filter @street-stocks/jobs jobs:normalize",
     "jobs:normalize": "pnpm --filter @street-stocks/jobs jobs:normalize",
     "jobs:score": "pnpm --filter @street-stocks/jobs jobs:score"
   },

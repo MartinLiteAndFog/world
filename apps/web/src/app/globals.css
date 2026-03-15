@@ -1,0 +1,11 @@
+.leaflet-map-shell {
+  width: 100%;
+  min-height: 420px;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.leaflet-map-canvas {
+  width: 100%;
+  min-height: 420px;
+}
