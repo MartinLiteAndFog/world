@@ -8,7 +8,10 @@
     "test": "turbo run test",
     "dev:api": "pnpm --filter @street-stocks/api dev",
     "dev:web": "pnpm --filter @street-stocks/web dev",
-    "jobs:seed": "pnpm --filter @street-stocks/jobs jobs:seed",
+    "dev:up": "./scripts/dev-up.sh",
+    "reset-db": "./scripts/reset-db.sh",
+    "jobs:seed": "pnpm --filter @street-stocks/jobs jobs:seed && pnpm --filter @street-stocks/jobs jobs:normalize",
+    "jobs:normalize": "pnpm --filter @street-stocks/jobs jobs:normalize",
     "jobs:score": "pnpm --filter @street-stocks/jobs jobs:score"
   },
   "devDependencies": {

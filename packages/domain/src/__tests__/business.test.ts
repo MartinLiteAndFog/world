@@ -44,7 +44,10 @@ describe("business domain invariants", () => {
       storageClass: "reference_only",
       policyName: "osm_reference",
       retentionClass: "rolling_30d",
-      attributionText: "OpenStreetMap contributors"
+      attributionText: "OpenStreetMap contributors",
+      referenceSnapshot: {
+        canonicalNameHint: "Example Cafe"
+      }
     });
 
     expect(raw.payload).toBeNull();

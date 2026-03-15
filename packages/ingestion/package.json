@@ -1,5 +1,5 @@
 {
-  "name": "@street-stocks/db",
+  "name": "@street-stocks/ingestion",
   "private": true,
   "type": "module",
   "exports": "./src/index.ts",
@@ -10,11 +10,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "pg": "^8.16.3"
+    "@street-stocks/db": "workspace:*",
+    "@street-stocks/domain": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",
-    "@types/pg": "^8.15.5",
     "vitest": "^3.2.4"
   }
 }

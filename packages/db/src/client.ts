@@ -1,25 +1,45 @@
 import { Pool, type QueryResult, type QueryResultRow } from "pg";
 
-const connectionString =
-  process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/street_stocks";
+let pool: Pool | null = null;
+let activeConnectionString: string | null = null;
 
-const pool = new Pool({
-  connectionString
-});
+function resolveConnectionString(): string {
+  return process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/street_stocks";
+}
 
 export function getPool(): Pool {
+  const connectionString = resolveConnectionString();
+
+  if (pool && activeConnectionString !== connectionString) {
+    throw new Error("Database pool already initialized with a different connection string");
+  }
+
+  if (!pool) {
+    pool = new Pool({
+      connectionString
+    });
+    activeConnectionString = connectionString;
+  }
+
   return pool;
 }
 
 export async function closePool(): Promise<void> {
-  await pool.end();
+  if (!pool) {
+    return;
+  }
+
+  const poolToClose = pool;
+  pool = null;
+  activeConnectionString = null;
+  await poolToClose.end();
 }
 
 export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   values: readonly unknown[] = []
 ): Promise<QueryResult<T>> {
-  return pool.query<T>(text, [...values]);
+  return getPool().query<T>(text, [...values]);
 }
 
 export async function sql<T extends QueryResultRow = QueryResultRow>(

@@ -1,11 +1,23 @@
 {
   "name": "@street-stocks/jobs",
   "private": true,
+  "type": "module",
   "scripts": {
-    "build": "node -e \"console.log('Jobs build scaffold ready')\"",
-    "jobs:seed": "node -e \"console.log('Seed job not implemented yet')\"",
-    "jobs:score": "node -e \"console.log('Score job not implemented yet')\"",
-    "lint": "node -e \"console.log('No jobs lint rules yet')\"",
-    "test": "node -e \"console.log('No jobs tests yet')\""
+    "build": "tsc -p tsconfig.json --noEmit",
+    "jobs:seed": "node --import tsx ./src/index.ts seed",
+    "jobs:normalize": "node --import tsx ./src/index.ts normalize",
+    "jobs:score": "node --import tsx ./src/index.ts score",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@street-stocks/db": "workspace:*",
+    "@street-stocks/ingestion": "workspace:*",
+    "@street-stocks/scoring": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "tsx": "^4.20.5",
+    "vitest": "^3.2.4"
   }
 }

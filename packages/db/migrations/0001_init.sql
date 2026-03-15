@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS raw_source_records (
   policy_name TEXT NOT NULL,
   retention_class TEXT NOT NULL,
   attribution_text TEXT NOT NULL,
+  reference_snapshot_json JSONB NOT NULL,
   payload_json JSONB,
   captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

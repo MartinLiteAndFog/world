@@ -6,6 +6,7 @@ export type RawSourceRecord = {
   policyName: string;
   retentionClass: string;
   attributionText: string;
+  referenceSnapshot: Record<string, unknown>;
   payload: unknown | null;
   capturedAt: string;
 };
@@ -25,6 +26,7 @@ type CreateRawSourceRecordInput = {
   policyName: string;
   retentionClass: string;
   attributionText: string;
+  referenceSnapshot: Record<string, unknown>;
   payload?: unknown | null;
   capturedAt?: string;
 };
@@ -38,6 +40,7 @@ export function createRawSourceRecord(input: CreateRawSourceRecordInput): RawSou
     policyName: input.policyName,
     retentionClass: input.retentionClass,
     attributionText: input.attributionText,
+    referenceSnapshot: input.referenceSnapshot,
     payload: input.payload ?? null,
     capturedAt: input.capturedAt ?? new Date().toISOString()
   };
