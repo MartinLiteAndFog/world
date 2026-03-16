@@ -10,5 +10,14 @@ export function getApiPort(): number {
 }
 
 export function getAllowedWebOrigins(): string[] {
-  return ["http://localhost:3000", "http://127.0.0.1:3000"];
+  const configuredOrigins = process.env.ALLOWED_WEB_ORIGINS;
+
+  if (!configuredOrigins) {
+    return ["http://localhost:3000", "http://127.0.0.1:3000"];
+  }
+
+  return configuredOrigins
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
 }
