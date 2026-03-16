@@ -6,12 +6,15 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "tsc -p tsconfig.json --noEmit",
+    "start": "next start",
     "test": "vitest run"
   },
   "dependencies": {
+    "cesium": "^1.139.1",
     "next": "^15.3.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "resium": "^1.19.4"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",

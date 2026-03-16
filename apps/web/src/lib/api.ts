@@ -38,8 +38,18 @@ export type BusinessDetail = {
   };
 };
 
-function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:3001";
+export function getApiBaseUrl(): string {
+  const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  if (configuredApiBaseUrl) {
+    return configuredApiBaseUrl;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("NEXT_PUBLIC_API_BASE_URL is required in production");
+  }
+
+  return "http://127.0.0.1:3001";
 }
 
 export async function fetchBusinesses(
