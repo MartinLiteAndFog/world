@@ -1,12 +1,17 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getApiBaseUrl } from "../lib/api";
+import * as api from "../lib/api";
+
+const { getApiBaseUrl } = api;
 
 const mutableEnv = process.env as Record<string, string | undefined>;
 const originalApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 const originalNodeEnv = process.env.NODE_ENV;
 
 afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+
   if (originalApiBaseUrl === undefined) {
     delete mutableEnv.NEXT_PUBLIC_API_BASE_URL;
   } else {
@@ -41,5 +46,54 @@ describe("getApiBaseUrl", () => {
     expect(() => getApiBaseUrl()).toThrow(
       "NEXT_PUBLIC_API_BASE_URL is required in production"
     );
+  });
+});
+
+describe("fetchCountrySummaries", () => {
+  it("reads country summaries from the API", async () => {
+    mutableEnv.NEXT_PUBLIC_API_BASE_URL = "https://api.streetstocks.app";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                countryCode: "US",
+                countryName: "United States",
+                businessCount: 1,
+                topCategory: "cafe",
+                averageBusinessValueScore: 75.2,
+                centroidLatitude: 40.7128,
+                centroidLongitude: -74.006
+              }
+            ]
+          }),
+          { status: 200 }
+        );
+      })
+    );
+
+    const fetchCountrySummaries = (
+      api as {
+        fetchCountrySummaries?: () => Promise<unknown>;
+      }
+    ).fetchCountrySummaries;
+
+    expect(fetchCountrySummaries).toBeTypeOf("function");
+    await expect(fetchCountrySummaries?.()).resolves.toEqual([
+      {
+        countryCode: "US",
+        countryName: "United States",
+        businessCount: 1,
+        topCategory: "cafe",
+        averageBusinessValueScore: 75.2,
+        centroidLatitude: 40.7128,
+        centroidLongitude: -74.006
+      }
+    ]);
+    expect(fetch).toHaveBeenCalledWith("https://api.streetstocks.app/countries", {
+      cache: "no-store"
+    });
   });
 });

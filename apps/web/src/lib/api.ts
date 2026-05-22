@@ -38,6 +38,16 @@ export type BusinessDetail = {
   };
 };
 
+export type CountrySummary = {
+  countryCode: string;
+  countryName: string;
+  businessCount: number;
+  topCategory: string | null;
+  averageBusinessValueScore: number;
+  centroidLatitude: number;
+  centroidLongitude: number;
+};
+
 export function getApiBaseUrl(): string {
   const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -65,6 +75,21 @@ export async function fetchBusinesses(
 
   const body = (await response.json()) as {
     items: BusinessListItem[];
+  };
+  return body.items;
+}
+
+export async function fetchCountrySummaries(): Promise<CountrySummary[]> {
+  const response = await fetch(`${getApiBaseUrl()}/countries`, {
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch country summaries");
+  }
+
+  const body = (await response.json()) as {
+    items: CountrySummary[];
   };
   return body.items;
 }

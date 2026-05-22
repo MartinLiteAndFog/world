@@ -50,6 +50,27 @@ describe("business query api", () => {
     expect(body.items[0]).not.toHaveProperty("payloadJson");
   });
 
+  it("GET /countries returns scored country summaries from normalized businesses", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/countries"
+    });
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(body.items).toEqual([
+      expect.objectContaining({
+        countryCode: "US",
+        countryName: "United States",
+        businessCount: 1,
+        topCategory: "cafe",
+        averageBusinessValueScore: 75.2,
+        centroidLatitude: 40.7128,
+        centroidLongitude: -74.006
+      })
+    ]);
+  });
+
   it("GET /businesses/:id returns one business with location and scorecard", async () => {
     const listResponse = await app.inject({
       method: "GET",

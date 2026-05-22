@@ -3,33 +3,98 @@
 import type { CSSProperties, JSX } from "react";
 import React, { useEffect, useRef, useState } from "react";
 
-import type { BusinessListItem } from "../../lib/api";
+import type { BusinessListItem, CountrySummary } from "../../lib/api";
+import { computeHoverHighlightTransition } from "../../lib/globe-hover";
+import { chooseImageryStrategy } from "../../lib/globe-imagery";
 import { HUD, type CameraPosition } from "./hud-styles";
 
 interface GlobeViewportProps {
   items: BusinessListItem[];
+  countrySummaries: CountrySummary[];
+  selectedCountryCode: string | null;
   selectedBusinessId: string | null;
   enabledCategories: Set<string>;
   onSelect: (id: string) => void;
+  onCountrySelect: (countryCode: string) => void;
   onCameraChange: (position: CameraPosition) => void;
+}
+
+const COUNTRY_BORDERS_URL = "/data/ne_50m_admin_0_countries.geojson";
+
+type CountryPolygonState = "default" | "hover" | "selected";
+
+type CountryStylePalette = {
+  defaultFill: any;
+  defaultStroke: any;
+  hoverFill: any;
+  hoverStroke: any;
+  selectedFill: any;
+  selectedStroke: any;
+};
+
+function countryCodeForEntity(entity: any): string | null {
+  if (!entity?.properties) return null;
+  const iso2 = entity.properties.ISO_A2?.getValue?.();
+  if (typeof iso2 === "string" && iso2.length > 0 && iso2 !== "-99") {
+    return iso2;
+  }
+  const iso3 = entity.properties.ISO_A3?.getValue?.();
+  if (typeof iso3 === "string" && iso3.length > 0 && iso3 !== "-99") {
+    return iso3;
+  }
+  return null;
+}
+
+function applyCountryStyle(
+  Cesium: any,
+  entity: any,
+  state: CountryPolygonState,
+  palette: CountryStylePalette
+): void {
+  if (!entity?.polygon) return;
+  const fill =
+    state === "selected"
+      ? palette.selectedFill
+      : state === "hover"
+      ? palette.hoverFill
+      : palette.defaultFill;
+  const stroke =
+    state === "selected"
+      ? palette.selectedStroke
+      : state === "hover"
+      ? palette.hoverStroke
+      : palette.defaultStroke;
+  entity.polygon.material = new Cesium.ColorMaterialProperty(fill);
+  entity.polygon.outline = new Cesium.ConstantProperty(true);
+  entity.polygon.outlineColor = new Cesium.ConstantProperty(stroke);
 }
 
 export default function GlobeViewport({
   items,
+  countrySummaries,
+  selectedCountryCode,
   selectedBusinessId,
   enabledCategories,
   onSelect,
+  onCountrySelect,
   onCameraChange,
 }: GlobeViewportProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<any>(null);
   const cesiumRef = useRef<any>(null);
   const onSelectRef = useRef(onSelect);
+  const onCountrySelectRef = useRef(onCountrySelect);
   const onCameraChangeRef = useRef(onCameraChange);
+  const countriesDataSourceRef = useRef<any>(null);
+  const countryPaletteRef = useRef<CountryStylePalette | null>(null);
+  const hoveredCountryEntityIdRef = useRef<string | null>(null);
+  const selectedCountryCodeRef = useRef<string | null>(selectedCountryCode);
   const [ready, setReady] = useState(false);
 
   onSelectRef.current = onSelect;
+  onCountrySelectRef.current = onCountrySelect;
   onCameraChangeRef.current = onCameraChange;
+  selectedCountryCodeRef.current = selectedCountryCode;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -44,12 +109,15 @@ export default function GlobeViewport({
 
       cesiumRef.current = Cesium;
 
-      if (process.env.NEXT_PUBLIC_CESIUM_TOKEN) {
-        Cesium.Ion.defaultAccessToken = process.env.NEXT_PUBLIC_CESIUM_TOKEN;
+      const cesiumToken = process.env.NEXT_PUBLIC_CESIUM_TOKEN;
+      if (cesiumToken) {
+        Cesium.Ion.defaultAccessToken = cesiumToken;
       }
 
       const creditContainer = document.createElement("div");
       creditContainer.style.display = "none";
+
+      const imageryStrategy = chooseImageryStrategy(cesiumToken);
 
       const viewer = new Cesium.Viewer(containerRef.current, {
         animation: false,
@@ -65,10 +133,14 @@ export default function GlobeViewport({
         creditContainer,
         scene3DOnly: true,
         orderIndependentTranslucency: false,
+        // Manage the imagery stack manually so we can swap between high-res
+        // Cesium Ion world imagery (when a token is configured) and the
+        // bundled NaturalEarthII tileset as an offline fallback.
+        baseLayer: false,
         contextOptions: {
           webgl: { alpha: true },
         },
-      });
+      } as any);
 
       if (destroyed) {
         viewer.destroy();
@@ -86,13 +158,73 @@ export default function GlobeViewport({
       if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = false;
       viewer.scene.fog.enabled = false;
 
+      if (imageryStrategy === "ion") {
+        try {
+          const ionImagery = await Cesium.createWorldImageryAsync();
+          if (destroyed) return;
+          viewer.imageryLayers.addImageryProvider(ionImagery);
+        } catch (e) {
+          console.warn(
+            "Cesium Ion world imagery unavailable; falling back to NaturalEarthII:",
+            e
+          );
+          try {
+            const fallback = await Cesium.TileMapServiceImageryProvider.fromUrl(
+              Cesium.buildModuleUrl("Assets/Textures/NaturalEarthII")
+            );
+            if (!destroyed) viewer.imageryLayers.addImageryProvider(fallback);
+          } catch (fallbackError) {
+            console.warn("NaturalEarthII fallback also unavailable:", fallbackError);
+          }
+        }
+      } else {
+        try {
+          const provider = await Cesium.TileMapServiceImageryProvider.fromUrl(
+            Cesium.buildModuleUrl("Assets/Textures/NaturalEarthII")
+          );
+          if (!destroyed) viewer.imageryLayers.addImageryProvider(provider);
+        } catch (e) {
+          console.warn("NaturalEarthII imagery not available:", e);
+        }
+      }
+
+      const accent = Cesium.Color.fromCssColorString(HUD.colors.accent);
+      const palette: CountryStylePalette = {
+        defaultFill: accent.withAlpha(0.05),
+        defaultStroke: accent.withAlpha(0.28),
+        hoverFill: accent.withAlpha(0.22),
+        hoverStroke: accent.withAlpha(0.9),
+        selectedFill: accent.withAlpha(0.4),
+        selectedStroke: accent.withAlpha(1),
+      };
+      countryPaletteRef.current = palette;
+
       try {
-        const provider = await Cesium.TileMapServiceImageryProvider.fromUrl(
-          Cesium.buildModuleUrl("Assets/Textures/NaturalEarthII")
+        const dataSource = await Cesium.GeoJsonDataSource.load(
+          COUNTRY_BORDERS_URL,
+          {
+            stroke: palette.defaultStroke,
+            fill: palette.defaultFill,
+            strokeWidth: 1,
+          }
         );
-        viewer.imageryLayers.addImageryProvider(provider);
+        if (destroyed) return;
+        await viewer.dataSources.add(dataSource);
+        countriesDataSourceRef.current = dataSource;
+
+        const selectedCode = selectedCountryCodeRef.current;
+        for (const entity of dataSource.entities.values) {
+          const code = countryCodeForEntity(entity);
+          const isSelected = !!selectedCode && code === selectedCode;
+          applyCountryStyle(
+            Cesium,
+            entity,
+            isSelected ? "selected" : "default",
+            palette
+          );
+        }
       } catch (e) {
-        console.warn("NaturalEarthII imagery not available:", e);
+        console.warn("Country borders dataset not available:", e);
       }
 
       const emitCameraPosition = () => {
@@ -109,13 +241,95 @@ export default function GlobeViewport({
       viewer.camera.changed.addEventListener(emitCameraPosition);
       viewer.camera.percentageChanged = 0.01;
 
+      const resolvePickedCountryEntity = (picked: any): any | null => {
+        if (!Cesium.defined(picked) || !picked.id) return null;
+        if (typeof picked.id !== "object") return null;
+        const dataSource = countriesDataSourceRef.current;
+        if (!dataSource) return null;
+        if (typeof dataSource.entities.contains === "function") {
+          return dataSource.entities.contains(picked.id) ? picked.id : null;
+        }
+        return countryCodeForEntity(picked.id) ? picked.id : null;
+      };
+
       const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+
       handler.setInputAction((event: { position: any }) => {
         const picked = viewer.scene.pick(event.position);
+
+        const countryEntity = resolvePickedCountryEntity(picked);
+        if (countryEntity) {
+          const code = countryCodeForEntity(countryEntity);
+          if (code) {
+            onCountrySelectRef.current(code);
+            return;
+          }
+        }
+
         if (Cesium.defined(picked) && picked.id && typeof picked.id.id === "string") {
+          if (picked.id.id.startsWith("country:")) {
+            onCountrySelectRef.current(picked.id.id.replace("country:", ""));
+            return;
+          }
+
           onSelectRef.current(picked.id.id);
         }
       }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+      handler.setInputAction((event: { endPosition: any }) => {
+        const dataSource = countriesDataSourceRef.current;
+        if (!dataSource) return;
+
+        const picked = viewer.scene.pick(event.endPosition);
+        const countryEntity = resolvePickedCountryEntity(picked);
+        const nextId: string | null = countryEntity ? countryEntity.id : null;
+        const prevId = hoveredCountryEntityIdRef.current;
+
+        const { restore, highlight } = computeHoverHighlightTransition(
+          prevId,
+          nextId
+        );
+
+        if (restore === null && highlight === null) {
+          return;
+        }
+
+        const paletteNow = countryPaletteRef.current;
+        if (!paletteNow) return;
+
+        const selectedCode = selectedCountryCodeRef.current;
+
+        if (restore) {
+          const restoreEntity = dataSource.entities.getById(restore);
+          if (restoreEntity) {
+            const code = countryCodeForEntity(restoreEntity);
+            const isSelected = !!selectedCode && code === selectedCode;
+            applyCountryStyle(
+              Cesium,
+              restoreEntity,
+              isSelected ? "selected" : "default",
+              paletteNow
+            );
+          }
+        }
+
+        if (highlight) {
+          const highlightEntity = dataSource.entities.getById(highlight);
+          if (highlightEntity) {
+            const code = countryCodeForEntity(highlightEntity);
+            const isSelected = !!selectedCode && code === selectedCode;
+            applyCountryStyle(
+              Cesium,
+              highlightEntity,
+              isSelected ? "selected" : "hover",
+              paletteNow
+            );
+          }
+        }
+
+        hoveredCountryEntityIdRef.current = nextId;
+        viewer.scene.requestRender();
+      }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
       emitCameraPosition();
       setReady(true);
@@ -133,10 +347,70 @@ export default function GlobeViewport({
     if (!ready) return;
 
     const Cesium = cesiumRef.current;
+    const dataSource = countriesDataSourceRef.current;
+    const palette = countryPaletteRef.current;
+    const viewer = viewerRef.current;
+    if (!Cesium || !dataSource || !palette || !viewer || viewer.isDestroyed()) {
+      return;
+    }
+
+    const hoveredId = hoveredCountryEntityIdRef.current;
+    for (const entity of dataSource.entities.values) {
+      const code = countryCodeForEntity(entity);
+      const isSelected = !!selectedCountryCode && code === selectedCountryCode;
+      const isHovered = entity.id === hoveredId;
+      const state: CountryPolygonState = isSelected
+        ? "selected"
+        : isHovered
+        ? "hover"
+        : "default";
+      applyCountryStyle(Cesium, entity, state, palette);
+    }
+    viewer.scene.requestRender();
+  }, [ready, selectedCountryCode]);
+
+  useEffect(() => {
+    if (!ready) return;
+
+    const Cesium = cesiumRef.current;
     const viewer = viewerRef.current;
     if (!Cesium || !viewer || viewer.isDestroyed()) return;
 
     viewer.entities.removeAll();
+
+    for (const country of countrySummaries) {
+      const isSelected = country.countryCode === selectedCountryCode;
+
+      viewer.entities.add({
+        id: `country:${country.countryCode}`,
+        position: Cesium.Cartesian3.fromDegrees(
+          country.centroidLongitude,
+          country.centroidLatitude,
+          80_000
+        ),
+        point: {
+          pixelSize: isSelected ? 18 : 14,
+          color: isSelected
+            ? Cesium.Color.fromCssColorString("#f59e0b")
+            : Cesium.Color.fromCssColorString("#f59e0b").withAlpha(0.72),
+          outlineColor: Cesium.Color.fromCssColorString(HUD.colors.bg),
+          outlineWidth: 2,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        label: {
+          text: country.countryName,
+          font: "11px 'Share Tech Mono', monospace",
+          fillColor: Cesium.Color.fromCssColorString(HUD.colors.textBright),
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          outlineWidth: 3,
+          outlineColor: Cesium.Color.fromCssColorString(HUD.colors.bg),
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -18),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          show: true,
+        },
+      });
+    }
 
     const filtered = items.filter(
       (item) => !item.category || enabledCategories.has(item.category)
@@ -173,7 +447,7 @@ export default function GlobeViewport({
     }
 
     viewer.scene.requestRender();
-  }, [ready, items, selectedBusinessId, enabledCategories]);
+  }, [ready, items, countrySummaries, selectedCountryCode, selectedBusinessId, enabledCategories]);
 
   return (
     <div style={styles.wrapper}>

@@ -3,15 +3,79 @@
 import type { CSSProperties, JSX } from "react";
 import React from "react";
 
-import type { BusinessDetail } from "../../lib/api";
+import type { BusinessDetail, CountrySummary } from "../../lib/api";
 import { HUD, panelBase } from "./hud-styles";
 
 interface RightPanelProps {
   detail: BusinessDetail | null;
+  countrySummary?: CountrySummary | null;
+  countrySummaries?: CountrySummary[];
 }
 
-export function RightPanel({ detail }: RightPanelProps): JSX.Element {
+export function RightPanel({
+  detail,
+  countrySummary = null,
+  countrySummaries = [],
+}: RightPanelProps): JSX.Element {
   if (!detail) {
+    if (countrySummary) {
+      return (
+        <aside style={styles.panel}>
+          <div style={styles.header}>
+            <span style={styles.headerTitle}>INTEL</span>
+          </div>
+          <div style={styles.body}>
+            <div style={styles.section}>
+              <span style={styles.sectionTitle}>COUNTRY SUMMARY</span>
+              <h3 style={styles.businessName}>{countrySummary.countryName}</h3>
+              <div style={styles.metaRow}>
+                <span style={styles.category}>
+                  {formatBusinessCount(countrySummary.businessCount)}
+                </span>
+                {countrySummary.topCategory && (
+                  <span style={styles.status}>{countrySummary.topCategory}</span>
+                )}
+              </div>
+            </div>
+
+            <div style={styles.divider} />
+
+            <div style={styles.section}>
+              <span style={styles.detailText}>
+                AVG SCORE {countrySummary.averageBusinessValueScore}
+              </span>
+              <span style={styles.coordText}>
+                {countrySummary.centroidLatitude.toFixed(4)},{" "}
+                {countrySummary.centroidLongitude.toFixed(4)}
+              </span>
+            </div>
+          </div>
+        </aside>
+      );
+    }
+
+    if (countrySummaries.length > 0) {
+      const businessCount = countrySummaries.reduce(
+        (total, summary) => total + summary.businessCount,
+        0
+      );
+
+      return (
+        <aside style={styles.panel}>
+          <div style={styles.header}>
+            <span style={styles.headerTitle}>INTEL</span>
+          </div>
+          <div style={styles.body}>
+            <div style={styles.section}>
+              <span style={styles.sectionTitle}>GLOBAL SUMMARY</span>
+              <h3 style={styles.businessName}>{formatCountryCount(countrySummaries.length)}</h3>
+              <span style={styles.detailText}>{formatBusinessCount(businessCount)}</span>
+            </div>
+          </div>
+        </aside>
+      );
+    }
+
     return (
       <aside style={styles.panel}>
         <div style={styles.header}>
@@ -95,6 +159,14 @@ export function RightPanel({ detail }: RightPanelProps): JSX.Element {
       </div>
     </aside>
   );
+}
+
+function formatBusinessCount(count: number): string {
+  return `${count} ${count === 1 ? "BUSINESS" : "BUSINESSES"}`;
+}
+
+function formatCountryCount(count: number): string {
+  return `${count} ${count === 1 ? "COUNTRY" : "COUNTRIES"}`;
 }
 
 const styles = {

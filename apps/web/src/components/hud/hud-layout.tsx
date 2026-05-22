@@ -7,8 +7,10 @@ import dynamic from "next/dynamic";
 import {
   fetchBusinesses,
   fetchBusinessDetail,
+  fetchCountrySummaries,
   type BusinessListItem,
   type BusinessDetail,
+  type CountrySummary,
 } from "../../lib/api";
 import type { CameraPosition } from "./hud-styles";
 import { HUD } from "./hud-styles";
@@ -35,6 +37,8 @@ const DEFAULT_CAMERA: CameraPosition = { lat: 30.27, lng: -97.74, alt: 15_000_00
 
 export function HudLayout(): JSX.Element {
   const [items, setItems] = useState<BusinessListItem[]>([]);
+  const [countrySummaries, setCountrySummaries] = useState<CountrySummary[]>([]);
+  const [selectedCountryCode, setSelectedCountryCode] = useState<string | null>(null);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
   const [detail, setDetail] = useState<BusinessDetail | null>(null);
   const [cameraPosition, setCameraPosition] = useState<CameraPosition>(DEFAULT_CAMERA);
@@ -51,6 +55,14 @@ export function HudLayout(): JSX.Element {
     }
     return map;
   }, [items]);
+
+  const selectedCountrySummary = useMemo(
+    () =>
+      countrySummaries.find(
+        (summary) => summary.countryCode === selectedCountryCode
+      ) ?? null,
+    [countrySummaries, selectedCountryCode]
+  );
 
   useEffect(() => {
     if (categoriesInitialized || categories.size === 0) return;
@@ -70,6 +82,17 @@ export function HudLayout(): JSX.Element {
   useEffect(() => {
     void loadBusinesses();
   }, [loadBusinesses]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const summaries = await fetchCountrySummaries();
+        setCountrySummaries(summaries);
+      } catch {
+        setCountrySummaries([]);
+      }
+    })();
+  }, []);
 
   const handleCameraChange = useCallback(
     (pos: CameraPosition) => {
@@ -126,9 +149,15 @@ export function HudLayout(): JSX.Element {
     <div style={styles.shell}>
       <GlobeViewport
         items={items}
+        countrySummaries={countrySummaries}
+        selectedCountryCode={selectedCountryCode}
         selectedBusinessId={selectedBusinessId}
         enabledCategories={enabledCategories}
         onSelect={setSelectedBusinessId}
+        onCountrySelect={(countryCode) => {
+          setSelectedCountryCode(countryCode);
+          setSelectedBusinessId(null);
+        }}
         onCameraChange={handleCameraChange}
       />
 
@@ -138,7 +167,11 @@ export function HudLayout(): JSX.Element {
         enabledCategories={enabledCategories}
         onToggleCategory={handleToggleCategory}
       />
-      <RightPanel detail={detail} />
+      <RightPanel
+        detail={detail}
+        countrySummary={selectedCountrySummary}
+        countrySummaries={countrySummaries}
+      />
       <BottomBar cameraPosition={cameraPosition} />
     </div>
   );
