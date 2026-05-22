@@ -1,6 +1,8 @@
 import { sql } from "@street-stocks/db";
 import type { FastifyInstance } from "fastify";
 
+import { estimateBusinessUnderwriting } from "../lib/underwriting.js";
+
 type BusinessDetailRow = {
   business_id: string;
   canonical_name: string;
@@ -67,6 +69,12 @@ export async function registerBusinessDetailRoutes(app: FastifyInstance): Promis
       };
     }
 
+    const underwriting = estimateBusinessUnderwriting({
+      category: row.category,
+      countryCode: row.country_code,
+      locality: row.locality
+    });
+
     return {
       business: {
         id: row.business_id,
@@ -93,7 +101,8 @@ export async function registerBusinessDetailRoutes(app: FastifyInstance): Promis
         scoreVersion: row.score_version,
         scoreValue: Number(row.score_value),
         factorBreakdown: row.factor_breakdown
-      }
+      },
+      underwriting
     };
   });
 }

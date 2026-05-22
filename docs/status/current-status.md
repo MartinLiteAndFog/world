@@ -2,11 +2,104 @@
 
 This document tracks the current working state of the project. It is intentionally separate from original plans and design documents, which should remain unchanged.
 
+## 2026-05-22 - Early Bird Intel Card v0 Underwriting
+
+### Current Goal
+
+Expand the selected-business intel card for Early Bird (Winsstraße 68, Berlin, `ice_cream`) with a first honest v0 underwriting panel that clearly separates **FACTS** from **MODELED** estimates, with confidence, ranges, due-diligence gaps, and citable open-data methodology.
+
+### Completed
+
+- Added a deterministic, pure v0 underwriting estimator at `apps/api/src/lib/underwriting.ts` (`estimateBusinessUnderwriting`, model version `v0_open_priors`).
+  - Scope: Berlin (`DE` + `Berlin`), categories `cafe`, `ice_cream`, `bakery`. All other categories/jurisdictions return `available: false` with a clear `UNAVAILABLE` label and the same due-diligence list.
+  - Returns ranges (not point estimates) for `dailyRevenueEur`, `annualRevenueEur`, `staffCostEurAnnual`, `rentEurMonthly`, and `customerCountDaily`.
+  - Returns a `confidence: "low"` tier, a `methodology` source list (DEHOGA Berlin, IHK Berlin, Amt für Statistik Berlin-Brandenburg, Destatis EVS, Uniteis e.V./Innungsverband Eis), and a `dueDiligenceMissing` list (POS sales, lease, seating, staff cost, opening hours, EBITDA).
+- Wired the estimator into `GET /businesses/:id` so the response now carries an `underwriting` block alongside `business`, `location`, and `scorecard`.
+- Extended `BusinessDetail` in `apps/web/src/lib/api.ts` with optional `underwriting`, plus new `UnderwritingEstimate`, `UnderwritingMoneyRange`, and `UnderwritingCountRange` types.
+- Expanded the right-panel intel card (`apps/web/src/components/hud/right-panel.tsx`) with new sections, in this order:
+  - `FACTS` (address, locality/region/postal, geohash, coordinates, `SOURCE: OSM · <conf>%`).
+  - `MODELED REVENUE` (badge: `LOW CONFIDENCE · v0_open_priors`, daily and annual EUR ranges, "Modeled estimate, not measured revenue.").
+  - `MODELED COSTS` (rent /month range, staff /year range).
+  - `MODELED DEMAND` (customers/day range).
+  - `DUE DILIGENCE MISSING` (bulleted list).
+  - `METHODOLOGY` (bulleted list of open-data sources).
+  - For unsupported categories/jurisdictions, the panel collapses to `MODELED ECONOMICS` with an `UNAVAILABLE · v0_open_priors` badge and still surfaces `DUE DILIGENCE MISSING`.
+
+### UI Language for Modeled vs Factual
+
+- Modeled fields are tagged with the `MODELED` label, `<CONFIDENCE> CONFIDENCE` (currently `LOW`), and the model version `v0_open_priors`, plus an explicit disclaimer line: "Modeled estimate, not measured revenue."
+- Revenue is shown as a EUR range with unit suffixes `/ day`, `/ month`, `/ year` — never as a single naked number and never as an EBITDA figure.
+- Unsupported categories show `UNAVAILABLE · v0_open_priors` and the same due-diligence list, so the panel never invents revenue for non-modeled records.
+- The `FACTS` section is the only place that surfaces concrete address, geohash, coordinates, and source attribution from the database.
+
+### Data Points / Estimates Added
+
+| Field | Type | Source |
+|-------|------|--------|
+| `underwriting.dailyRevenueEur` | EUR range, `period: "daily"` | `v0_open_priors` Berlin priors |
+| `underwriting.annualRevenueEur` | EUR range, `period: "annual"` | `v0_open_priors` Berlin priors |
+| `underwriting.staffCostEurAnnual` | EUR range, `period: "annual"` | `v0_open_priors` Berlin priors |
+| `underwriting.rentEurMonthly` | EUR range, `period: "monthly"` | `v0_open_priors` Berlin priors |
+| `underwriting.customerCountDaily` | integer range | `v0_open_priors` Berlin priors |
+| `underwriting.methodology` | string[] | open-data citations |
+| `underwriting.dueDiligenceMissing` | string[] | DD gap list |
+| `underwriting.confidence` | `"low"` | model tier |
+| `underwriting.notes` | string[] | seasonality + per-ticket commentary |
+| `FACTS.SOURCE` | `"OSM · <conf>%"` | `location.sourceName`, `location.confidence` |
+
+### Verification
+
+- Wrote red estimator tests first (`apps/api/src/lib/__tests__/underwriting.test.ts`), then implemented; 6/6 green.
+- Wrote red API integration tests for `GET /businesses/:id` returning `underwriting` for Early Bird (ice_cream) and `UNAVAILABLE` for pharmacy; both red→green. `pnpm --filter @street-stocks/api exec vitest run src/__tests__/businesses.test.ts` 7/7 (10/10 in earlier counts had included e2e Docker test which is excluded here because Docker socket is sandbox-denied).
+- Wrote red right-panel tests for the new MODELED/FACTS/DD sections and the UNAVAILABLE state; both red→green after adding `cleanup()` between tests.
+- Full web test suite: `pnpm --filter @street-stocks/web test` → 36/36 passing across 9 files (was 33/33 before this slice; +3 tests for underwriting/right-panel).
+- Non-Docker API suite: `vitest run src/__tests__/businesses.test.ts src/__tests__/cors.test.ts src/__tests__/env.test.ts src/lib/__tests__/underwriting.test.ts` → 17/17.
+- `pnpm lint` → 8/8 successful (cached + fresh).
+- `pnpm build` → 8/8 successful, Next.js production build green.
+- GitNexus `detect_changes` → 9 changed files, 0 changed indexed symbols, 0 affected processes, risk LOW.
+- GitNexus `impact` returned a `Buffer manager exception: Mmap for size 8796093022208 failed` for `registerBusinessDetailRoutes` and `RightPanel`. Manual upstream blast radius:
+  - `registerBusinessDetailRoutes` — d=1 caller: `apps/api/src/server.ts` (registration only, signature unchanged). LOW.
+  - `RightPanel` — d=1 callers: `apps/web/src/components/hud/hud-layout.tsx` (props unchanged) and `right-panel.test.tsx`. LOW.
+  - `BusinessDetail` — extended with only an optional `underwriting` field; all existing readers compatible. LOW.
+  - `estimateBusinessUnderwriting`, `UnderwritingEstimate`, `UnderwritingMoneyRange`, `UnderwritingCountRange` — new symbols, no prior upstream callers. LOW.
+
+### Files Changed
+
+- `apps/api/src/lib/underwriting.ts` (new)
+- `apps/api/src/lib/__tests__/underwriting.test.ts` (new)
+- `apps/api/src/routes/business-detail.ts`
+- `apps/api/src/__tests__/businesses.test.ts`
+- `apps/web/src/lib/api.ts`
+- `apps/web/src/components/hud/right-panel.tsx`
+- `apps/web/src/__tests__/right-panel.test.tsx`
+- `docs/status/current-status.md`
+
+### Known Limitations / What Still Needs Real or Private Data
+
+- `v0_open_priors` is a wide, deterministic open-data prior — not a calibrated model. All numbers are clearly labeled `MODELED · LOW CONFIDENCE`.
+- The estimator does not yet use Early Bird-specific signals (seating count, indoor/outdoor area, opening-hours coverage, neighborhood foot traffic, competitor density). OSM `osmTags` are not persisted to the database in the current `reference_only` storage policy, so we cannot factor in `opening_hours`, `wheelchair`, `internet_access`, or `outdoor_seating` from the DB without a schema change.
+- The estimator does not consume competitor density from the existing `/businesses` query yet; this is a low-cost v0.1 follow-up.
+- The right-panel does not yet show OSM website/contact links or operating-hours facts (would require a schema change to persist OSM tags or to introduce a `business_attributes` table).
+- True facts still missing in v0: POS sales, lease term / rent / escalator, staff headcount, EBITDA, owner addbacks — all listed in the `DUE DILIGENCE MISSING` section.
+
+### Deploy / Commit Status
+
+- **Not committed and not pushed** per task instruction. No DB migrations were required; the API computes `underwriting` per-request from `category + countryCode + locality`.
+- Safe to commit and deploy without a Railway bootstrap rerun because no schema or seed change was introduced. The deployed API will start returning `underwriting` for `/businesses/:id` on next release.
+
+### Next Steps
+
+1. Visual review of the new intel card on the running web app (Early Bird selected) once committed/redeployed.
+2. v0.1: add competitor density (count of `cafe + ice_cream + bakery` within ~150 m of selected business) as a `MODELED COMPETITION` factor in the estimator and the right panel.
+3. v0.2: persist a small subset of OSM tags (`opening_hours`, `outdoor_seating`, `indoor_seating`, `internet_access`, `wheelchair`, `website`, `contact:phone`) into a `business_attributes` table and surface them in `FACTS`.
+4. v1: replace `v0_open_priors` with a calibrated model that uses real performance samples, neighborhood proxies, and seasonality.
+
 ## 2026-05-22 - Deployment & Production State
 
 ### Street Stocks Globe/Category UI Fix
 
 - Fixed far-side globe marker/label bleed-through by restoring Cesium depth testing for country and business point/label entities (`disableDepthTestDistance: 0`) and enabling globe terrain depth testing. Australia and other far-side labels should now be occluded instead of showing through Europe.
+- Fixed near-side business marker clipping by lifting depth-tested point markers to `GLOBE_MARKER_SURFACE_ALTITUDE_METERS` (50 m) above the ellipsoid so circles no longer disappear into globe/imagery while far-side occlusion remains enabled.
 - Fixed country-click category behavior by adding per-country `categoryCounts` to `/countries` and switching the HUD category panel to the selected-country scope after a country click.
 - Added a category scope switch in the HUD with `GLOBAL`, `NATIONAL`, and `VIEWPORT` modes:
   - `GLOBAL` aggregates category counts from `/countries`.
@@ -64,7 +157,7 @@ This document tracks the current working state of the project. It is intentional
 
 ### Known Issues
 
-- **Far-side marker bleed-through**: entity markers from the far side of the globe can show through. Likely cause: markers use `disableDepthTestDistance: Number.POSITIVE_INFINITY`. Recommended fix: set marker/label depth test distance to `0` (or remove the override) and optionally enable globe depth test if needed.
+- **Near-side marker ground clipping**: fixed by elevating business markers to `GLOBE_MARKER_SURFACE_ALTITUDE_METERS` while keeping depth testing enabled for far-side occlusion.
 
 - **Production hover optimization pending redeploy**: coalesced `requestAnimationFrame` picking, cached style properties, lower fill alpha, and `requestRenderMode` are in the latest push but need Railway redeploy. After deploy, hover should be smoother with no dominant translucent overlay.
 

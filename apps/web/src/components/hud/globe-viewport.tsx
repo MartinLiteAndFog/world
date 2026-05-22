@@ -12,6 +12,7 @@ import {
 import {
   configureGlobeDepthTesting,
   GLOBE_ENTITY_DEPTH_TEST_DISTANCE,
+  GLOBE_MARKER_SURFACE_ALTITUDE_METERS,
 } from "../../lib/globe-depth";
 import { chooseImageryStrategy } from "../../lib/globe-imagery";
 import { HUD, type CameraPosition } from "./hud-styles";
@@ -442,7 +443,11 @@ export default function GlobeViewport({
 
       viewer.entities.add({
         id: item.id,
-        position: Cesium.Cartesian3.fromDegrees(item.longitude, item.latitude),
+        position: Cesium.Cartesian3.fromDegrees(
+          item.longitude,
+          item.latitude,
+          GLOBE_MARKER_SURFACE_ALTITUDE_METERS
+        ),
         point: {
           pixelSize: isSelected ? 10 : 6,
           color: isSelected

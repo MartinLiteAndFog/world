@@ -3,7 +3,13 @@
 import type { CSSProperties, JSX } from "react";
 import React from "react";
 
-import type { BusinessDetail, CountrySummary } from "../../lib/api";
+import type {
+  BusinessDetail,
+  CountrySummary,
+  UnderwritingCountRange,
+  UnderwritingEstimate,
+  UnderwritingMoneyRange,
+} from "../../lib/api";
 import { HUD, panelBase } from "./hud-styles";
 
 interface RightPanelProps {
@@ -91,7 +97,7 @@ export function RightPanel({
     );
   }
 
-  const { business, location, scorecard } = detail;
+  const { business, location, scorecard, underwriting } = detail;
 
   return (
     <aside style={styles.panel}>
@@ -133,32 +139,178 @@ export function RightPanel({
 
         <div style={styles.divider} />
 
-        <div style={styles.section}>
-          <span style={styles.sectionTitle}>LOCATION</span>
-          {(location.displayAddressLine1 ?? location.canonicalAddressLine1) && (
-            <span style={styles.detailText}>
-              {location.displayAddressLine1 ?? location.canonicalAddressLine1}
-            </span>
-          )}
-          {location.locality && (
-            <span style={styles.detailText}>
-              {location.locality}
-              {location.region ? `, ${location.region}` : ""}
-              {location.postalCode ? ` ${location.postalCode}` : ""}
-            </span>
-          )}
-          <span style={styles.detailText}>
-            GEOHASH: {location.geohash}
-          </span>
-          {location.latitude != null && location.longitude != null && (
-            <span style={styles.coordText}>
-              {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
-            </span>
-          )}
-        </div>
+        <FactsSection location={location} />
+
+        {underwriting && (
+          <>
+            <div style={styles.divider} />
+            <UnderwritingSections underwriting={underwriting} />
+          </>
+        )}
       </div>
     </aside>
   );
+}
+
+function FactsSection({ location }: { location: BusinessDetail["location"] }): JSX.Element {
+  const sourceLabel = location.sourceName ? location.sourceName.toUpperCase() : null;
+
+  return (
+    <div style={styles.section}>
+      <span style={styles.sectionTitle}>FACTS</span>
+      {(location.displayAddressLine1 ?? location.canonicalAddressLine1) && (
+        <span style={styles.detailText}>
+          {location.displayAddressLine1 ?? location.canonicalAddressLine1}
+        </span>
+      )}
+      {location.locality && (
+        <span style={styles.detailText}>
+          {location.locality}
+          {location.region ? `, ${location.region}` : ""}
+          {location.postalCode ? ` ${location.postalCode}` : ""}
+        </span>
+      )}
+      <span style={styles.detailText}>GEOHASH: {location.geohash}</span>
+      {location.latitude != null && location.longitude != null && (
+        <span style={styles.coordText}>
+          {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+        </span>
+      )}
+      {sourceLabel && (
+        <span style={styles.detailMuted}>
+          SOURCE: {sourceLabel}
+          {typeof location.confidence === "number"
+            ? ` · ${(location.confidence * 100).toFixed(0)}% loc. conf.`
+            : ""}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function UnderwritingSections({
+  underwriting,
+}: {
+  underwriting: UnderwritingEstimate;
+}): JSX.Element {
+  if (!underwriting.available) {
+    return (
+      <div style={styles.section}>
+        <span style={styles.sectionTitle}>MODELED ECONOMICS</span>
+        <span style={styles.unavailableBadge}>
+          UNAVAILABLE · {underwriting.modelVersion}
+        </span>
+        {underwriting.notes.slice(0, 2).map((note, index) => (
+          <span key={index} style={styles.detailMuted}>
+            {note}
+          </span>
+        ))}
+
+        <div style={styles.divider} />
+
+        <DueDiligenceSection items={underwriting.dueDiligenceMissing} />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div style={styles.section}>
+        <span style={styles.sectionTitle}>MODELED REVENUE</span>
+        <span style={styles.modeledBadge}>
+          {underwriting.confidence.toUpperCase()} CONFIDENCE ·{" "}
+          {underwriting.modelVersion}
+        </span>
+        {underwriting.dailyRevenueEur && (
+          <span style={styles.detailText}>
+            {formatMoneyRange(underwriting.dailyRevenueEur)}
+          </span>
+        )}
+        {underwriting.annualRevenueEur && (
+          <span style={styles.detailText}>
+            {formatMoneyRange(underwriting.annualRevenueEur)}
+          </span>
+        )}
+        <span style={styles.detailMuted}>
+          Modeled estimate, not measured revenue.
+        </span>
+      </div>
+
+      {(underwriting.staffCostEurAnnual || underwriting.rentEurMonthly) && (
+        <>
+          <div style={styles.divider} />
+          <div style={styles.section}>
+            <span style={styles.sectionTitle}>MODELED COSTS</span>
+            {underwriting.rentEurMonthly && (
+              <span style={styles.detailText}>
+                Rent {formatMoneyRange(underwriting.rentEurMonthly)}
+              </span>
+            )}
+            {underwriting.staffCostEurAnnual && (
+              <span style={styles.detailText}>
+                Staff {formatMoneyRange(underwriting.staffCostEurAnnual)}
+              </span>
+            )}
+          </div>
+        </>
+      )}
+
+      {underwriting.customerCountDaily && (
+        <>
+          <div style={styles.divider} />
+          <div style={styles.section}>
+            <span style={styles.sectionTitle}>MODELED DEMAND</span>
+            <span style={styles.detailText}>
+              {formatCountRange(underwriting.customerCountDaily, "customers")}
+            </span>
+          </div>
+        </>
+      )}
+
+      <div style={styles.divider} />
+      <DueDiligenceSection items={underwriting.dueDiligenceMissing} />
+
+      <div style={styles.divider} />
+      <div style={styles.section}>
+        <span style={styles.sectionTitle}>METHODOLOGY</span>
+        {underwriting.methodology.map((source) => (
+          <span key={source} style={styles.detailMuted}>
+            · {source}
+          </span>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function DueDiligenceSection({ items }: { items: string[] }): JSX.Element {
+  return (
+    <div style={styles.section}>
+      <span style={styles.sectionTitle}>DUE DILIGENCE MISSING</span>
+      {items.map((item) => (
+        <span key={item} style={styles.detailText}>
+          · {item}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+const EURO_FORMATTER = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 0,
+});
+
+function formatEuroAmount(value: number): string {
+  return `€${EURO_FORMATTER.format(value)}`;
+}
+
+function formatMoneyRange(range: UnderwritingMoneyRange): string {
+  return `${formatEuroAmount(range.low)}–${formatEuroAmount(range.high)} / ${range.period === "annual" ? "year" : range.period === "monthly" ? "month" : "day"}`;
+}
+
+function formatCountRange(range: UnderwritingCountRange, noun: string): string {
+  const fmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+  return `${fmt.format(range.low)}–${fmt.format(range.high)} ${noun} / day`;
 }
 
 function formatBusinessCount(count: number): string {
@@ -296,11 +448,39 @@ const styles = {
     fontFamily: HUD.font,
     lineHeight: 1.4,
   },
+  detailMuted: {
+    fontSize: "10px",
+    color: HUD.colors.textDim,
+    fontFamily: HUD.font,
+    lineHeight: 1.4,
+  },
   coordText: {
     fontSize: "10px",
     color: HUD.colors.textDim,
     fontFamily: HUD.font,
     fontVariantNumeric: "tabular-nums",
+  },
+  modeledBadge: {
+    display: "inline-block",
+    alignSelf: "flex-start",
+    padding: "2px 6px",
+    border: `1px solid ${HUD.colors.accent}`,
+    color: HUD.colors.accent,
+    fontFamily: HUD.font,
+    fontSize: "9px",
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+  },
+  unavailableBadge: {
+    display: "inline-block",
+    alignSelf: "flex-start",
+    padding: "2px 6px",
+    border: `1px solid ${HUD.colors.textDim}`,
+    color: HUD.colors.textDim,
+    fontFamily: HUD.font,
+    fontSize: "9px",
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
   },
   emptyState: {
     display: "flex",

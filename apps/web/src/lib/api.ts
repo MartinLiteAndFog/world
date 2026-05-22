@@ -9,6 +9,35 @@ export type BusinessListItem = {
   longitude: number;
 };
 
+export type UnderwritingMoneyRange = {
+  low: number;
+  high: number;
+  currency: "EUR";
+  period: "daily" | "monthly" | "annual";
+};
+
+export type UnderwritingCountRange = {
+  low: number;
+  high: number;
+  period: "daily";
+};
+
+export type UnderwritingEstimate = {
+  available: boolean;
+  label: "MODELED" | "UNAVAILABLE";
+  modelVersion: string;
+  jurisdiction: string;
+  confidence: "low" | "medium" | "high";
+  methodology: string[];
+  notes: string[];
+  dueDiligenceMissing: string[];
+  dailyRevenueEur?: UnderwritingMoneyRange;
+  annualRevenueEur?: UnderwritingMoneyRange;
+  staffCostEurAnnual?: UnderwritingMoneyRange;
+  rentEurMonthly?: UnderwritingMoneyRange;
+  customerCountDaily?: UnderwritingCountRange;
+};
+
 export type BusinessDetail = {
   business: {
     id: string;
@@ -36,6 +65,7 @@ export type BusinessDetail = {
     scoreValue: number;
     factorBreakdown: Array<{ key: string; label: string; value: number }>;
   };
+  underwriting?: UnderwritingEstimate;
 };
 
 export type CountrySummary = {
