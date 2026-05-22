@@ -2,6 +2,38 @@
 
 This document tracks the current working state of the project. It is intentionally separate from original plans and design documents, which should remain unchanged.
 
+## 2026-05-22 - Score v2 Pure Scoring Slice
+
+### Current Goal
+
+Add the first score-v2 implementation slice as a pure, additive scoring module in `packages/scoring`, without wiring it into jobs, API, UI, or database migrations.
+
+### Completed
+
+- Added `scoreBusinessV2` in `packages/scoring/src/score-business-v2.ts` with model version `score_v2`.
+- Added the v2 factor weights: `categoryDemand` 0.20, `siteQuality` 0.20, `competition` 0.15, `economicViability` 0.30, and `operatingReach` 0.15.
+- Each factor accepts a `dataTier` of `measured`, `modeled`, or `missing`; available values are normalized to `[0, 1]`.
+- Missing factors are excluded from score contribution and renormalize the effective weights of available factors instead of directly penalizing score.
+- Confidence is separate from score: missing factors reduce confidence, and `modeled` factors carry lower confidence than `measured` factors for the same value.
+- The result returns an integer `score` in `[0, 100]`, `modelVersion`, numeric `confidence`, `confidenceTier`, and a five-factor breakdown with base weight, effective weight, contribution points, data tier, value, label, and short explanation.
+- Exported the v2 scorer, constants, and public types from `packages/scoring/src/index.ts` while leaving v1 `scoreBusiness`, `FACTOR_WEIGHTS`, and `SCORE_VERSION` unchanged.
+
+### Verification
+
+- Wrote red v2 tests first. Initial red failed because `score-business-v2` did not exist; the stubbed module then failed assertion-level checks for bounds, renormalization, confidence shrinkage, modeled confidence, and the Early Bird-shaped case.
+- `pnpm --filter @street-stocks/scoring test` passed: 10/10 tests across v1 and v2 scoring.
+- `pnpm --filter @street-stocks/scoring build` passed after tightening strict TypeScript narrowing.
+- `pnpm lint` passed: 8/8 turbo lint tasks.
+- GitNexus `impact` for the existing scoring package index export hit the known mmap failure (`Mmap for size 8796093022208 failed`). Manual upstream blast radius found the only current package consumer is `apps/jobs/src/commands/score.ts`; v1 export names and behavior are unchanged, so risk is LOW.
+- GitNexus `detect_changes({ scope: "all" })` returned risk LOW with 0 changed indexed symbols and 0 affected processes, but it only reported the tracked export file and did not map new untracked v2 files into the existing index.
+
+### Next Steps
+
+1. Jobs wiring: add an explicit score-v2 job path or feature flag that computes `scoreBusinessV2` from persisted inputs without replacing v1 yet.
+2. API wiring: expose v2 scorecards alongside v1 with versioned response fields and clear confidence/data-tier provenance.
+3. UI wiring: add factor-level display copy using the returned explanations, contribution points, effective weights, and confidence tier.
+4. Persistence: only add migrations once the v2 scorecard storage shape is chosen; this slice intentionally added no DB schema changes.
+
 ## 2026-05-22 - Early Bird Intel Card v0 Underwriting
 
 ### Current Goal
