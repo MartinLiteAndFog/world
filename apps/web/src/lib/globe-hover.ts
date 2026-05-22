@@ -12,6 +12,17 @@ export type HoverHighlightTransition = {
   highlight: string | null;
 };
 
+type HoverFrameSchedulerOptions<TEvent> = {
+  requestAnimationFrame: (callback: FrameRequestCallback) => number;
+  cancelAnimationFrame: (handle: number) => void;
+  onFrame: (event: TEvent) => void;
+};
+
+export type HoverFrameScheduler<TEvent> = {
+  schedule: (event: TEvent) => void;
+  cancel: () => void;
+};
+
 export function computeHoverHighlightTransition(
   previousHoveredId: string | null,
   nextHoveredId: string | null
@@ -23,5 +34,39 @@ export function computeHoverHighlightTransition(
   return {
     restore: previousHoveredId,
     highlight: nextHoveredId,
+  };
+}
+
+export function createRafHoverScheduler<TEvent>({
+  requestAnimationFrame,
+  cancelAnimationFrame,
+  onFrame,
+}: HoverFrameSchedulerOptions<TEvent>): HoverFrameScheduler<TEvent> {
+  let queuedEvent: TEvent | null = null;
+  let frameHandle: number | null = null;
+
+  const cancel = () => {
+    if (frameHandle !== null) {
+      cancelAnimationFrame(frameHandle);
+    }
+    frameHandle = null;
+    queuedEvent = null;
+  };
+
+  return {
+    schedule: (event) => {
+      queuedEvent = event;
+      if (frameHandle !== null) return;
+
+      frameHandle = requestAnimationFrame(() => {
+        const eventForFrame = queuedEvent;
+        frameHandle = null;
+        queuedEvent = null;
+        if (eventForFrame !== null) {
+          onFrame(eventForFrame);
+        }
+      });
+    },
+    cancel,
   };
 }

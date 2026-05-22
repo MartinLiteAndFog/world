@@ -4,7 +4,11 @@ import type { CSSProperties, JSX } from "react";
 import React, { useEffect, useRef, useState } from "react";
 
 import type { BusinessListItem, CountrySummary } from "../../lib/api";
-import { computeHoverHighlightTransition } from "../../lib/globe-hover";
+import {
+  computeHoverHighlightTransition,
+  createRafHoverScheduler,
+  type HoverFrameScheduler,
+} from "../../lib/globe-hover";
 import { chooseImageryStrategy } from "../../lib/globe-imagery";
 import { HUD, type CameraPosition } from "./hud-styles";
 
@@ -24,12 +28,15 @@ const COUNTRY_BORDERS_URL = "/data/ne_50m_admin_0_countries.geojson";
 type CountryPolygonState = "default" | "hover" | "selected";
 
 type CountryStylePalette = {
-  defaultFill: any;
-  defaultStroke: any;
-  hoverFill: any;
-  hoverStroke: any;
-  selectedFill: any;
-  selectedStroke: any;
+  default: CountryStyle;
+  hover: CountryStyle;
+  selected: CountryStyle;
+};
+
+type CountryStyle = {
+  material: any;
+  outline: any;
+  outlineColor: any;
 };
 
 function countryCodeForEntity(entity: any): string | null {
@@ -52,21 +59,15 @@ function applyCountryStyle(
   palette: CountryStylePalette
 ): void {
   if (!entity?.polygon) return;
-  const fill =
+  const style =
     state === "selected"
-      ? palette.selectedFill
+      ? palette.selected
       : state === "hover"
-      ? palette.hoverFill
-      : palette.defaultFill;
-  const stroke =
-    state === "selected"
-      ? palette.selectedStroke
-      : state === "hover"
-      ? palette.hoverStroke
-      : palette.defaultStroke;
-  entity.polygon.material = new Cesium.ColorMaterialProperty(fill);
-  entity.polygon.outline = new Cesium.ConstantProperty(true);
-  entity.polygon.outlineColor = new Cesium.ConstantProperty(stroke);
+      ? palette.hover
+      : palette.default;
+  entity.polygon.material = style.material;
+  entity.polygon.outline = style.outline;
+  entity.polygon.outlineColor = style.outlineColor;
 }
 
 export default function GlobeViewport({
@@ -100,6 +101,7 @@ export default function GlobeViewport({
     if (!containerRef.current) return;
 
     let destroyed = false;
+    let hoverScheduler: HoverFrameScheduler<{ endPosition: any }> | null = null;
 
     (async () => {
       (window as any).CESIUM_BASE_URL = "/cesium";
@@ -132,6 +134,7 @@ export default function GlobeViewport({
         infoBox: false,
         creditContainer,
         scene3DOnly: true,
+        requestRenderMode: true,
         orderIndependentTranslucency: false,
         // Manage the imagery stack manually so we can swap between high-res
         // Cesium Ion world imagery (when a token is configured) and the
@@ -189,13 +192,15 @@ export default function GlobeViewport({
       }
 
       const accent = Cesium.Color.fromCssColorString(HUD.colors.accent);
+      const createCountryStyle = (fill: any, stroke: any): CountryStyle => ({
+        material: new Cesium.ColorMaterialProperty(fill),
+        outline: new Cesium.ConstantProperty(true),
+        outlineColor: new Cesium.ConstantProperty(stroke),
+      });
       const palette: CountryStylePalette = {
-        defaultFill: accent.withAlpha(0.05),
-        defaultStroke: accent.withAlpha(0.28),
-        hoverFill: accent.withAlpha(0.22),
-        hoverStroke: accent.withAlpha(0.9),
-        selectedFill: accent.withAlpha(0.4),
-        selectedStroke: accent.withAlpha(1),
+        default: createCountryStyle(accent.withAlpha(0.015), accent.withAlpha(0.35)),
+        hover: createCountryStyle(accent.withAlpha(0.08), accent.withAlpha(0.95)),
+        selected: createCountryStyle(accent.withAlpha(0.16), accent.withAlpha(1)),
       };
       countryPaletteRef.current = palette;
 
@@ -203,8 +208,8 @@ export default function GlobeViewport({
         const dataSource = await Cesium.GeoJsonDataSource.load(
           COUNTRY_BORDERS_URL,
           {
-            stroke: palette.defaultStroke,
-            fill: palette.defaultFill,
+            stroke: accent.withAlpha(0.35),
+            fill: accent.withAlpha(0.015),
             strokeWidth: 1,
           }
         );
@@ -276,7 +281,7 @@ export default function GlobeViewport({
         }
       }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-      handler.setInputAction((event: { endPosition: any }) => {
+      const updateCountryHover = (event: { endPosition: any }) => {
         const dataSource = countriesDataSourceRef.current;
         if (!dataSource) return;
 
@@ -329,6 +334,16 @@ export default function GlobeViewport({
 
         hoveredCountryEntityIdRef.current = nextId;
         viewer.scene.requestRender();
+      };
+
+      hoverScheduler = createRafHoverScheduler({
+        requestAnimationFrame: window.requestAnimationFrame.bind(window),
+        cancelAnimationFrame: window.cancelAnimationFrame.bind(window),
+        onFrame: updateCountryHover,
+      });
+
+      handler.setInputAction((event: { endPosition: any }) => {
+        hoverScheduler?.schedule(event);
       }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
       emitCameraPosition();
@@ -337,6 +352,7 @@ export default function GlobeViewport({
 
     return () => {
       destroyed = true;
+      hoverScheduler?.cancel();
       if (viewerRef.current && !viewerRef.current.isDestroyed()) {
         viewerRef.current.destroy();
       }

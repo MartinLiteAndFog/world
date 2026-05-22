@@ -11,7 +11,24 @@ type CountrySummaryRow = {
 };
 
 const COUNTRY_NAMES: Record<string, string> = {
-  US: "United States"
+  AU: "Australia",
+  BR: "Brazil",
+  CA: "Canada",
+  DE: "Germany",
+  ES: "Spain",
+  FR: "France",
+  GB: "United Kingdom",
+  HK: "Hong Kong",
+  IL: "Israel",
+  IN: "India",
+  IT: "Italy",
+  JP: "Japan",
+  KR: "South Korea",
+  MX: "Mexico",
+  NL: "Netherlands",
+  SG: "Singapore",
+  US: "United States",
+  ZA: "South Africa"
 };
 
 function getCountryName(countryCode: string): string {

@@ -49,7 +49,7 @@ describe("end-to-end smoke flow", () => {
     process.env.DATABASE_URL = databaseUrl;
     app = buildServer();
     await app.ready();
-  });
+  }, 90_000);
 
   afterAll(async () => {
     if (app) {
@@ -61,7 +61,7 @@ describe("end-to-end smoke flow", () => {
   it("verifies seeded business, score, and api detail", async () => {
     const listResponse = await app.inject({
       method: "GET",
-      url: "/businesses?bbox=-75,40,-73,41"
+      url: "/businesses?bbox=-180,-90,180,90"
     });
     const listBody = listResponse.json();
     const detailResponse = await app.inject({

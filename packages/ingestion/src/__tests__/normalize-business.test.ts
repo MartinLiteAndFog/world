@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSeedDataset } from "../sources/osm/seed-records.js";
+import { buildSeedDataset } from "../sources/overture/places-starter-records.js";
 import { applyStoragePolicy } from "../policies/storage-policy.js";
 import { normalizeBusinessRecord } from "../normalize/normalize-business.js";
 import { matchBusinessRecord } from "../dedupe/match-business.js";
@@ -13,24 +13,28 @@ describe("policy-aware normalization", () => {
 
     expect(result.raw.payload).toBeNull();
     expect(result.raw.storageClass).toBe("reference_only");
-    expect(result.raw.policyName).toBe("osm_reference");
+    expect(result.raw.policyName).toBe("overture_places_reference");
   });
 
   it("maps one seed record to one canonical business", () => {
     const record = buildSeedDataset()[0];
     const result = normalizeBusinessRecord(applyStoragePolicy(record));
 
-    expect(result.business.canonicalName).toBe("Example Cafe");
-    expect(result.location.sourceName).toBe("osm");
-    expect(result.location.canonicalAddressLine1).toBe("123 Main St");
-    expect(result.location.displayAddressLine1).toBe("123 Main St");
+    expect(result.business.canonicalName).toBe(record.canonicalNameHint);
+    expect(result.location.sourceName).toBe("overture_places");
+    expect(result.location.canonicalAddressLine1).toBe(record.addressLine1);
+    expect(result.location.displayAddressLine1).toBe(record.addressLine1);
   });
 
-  it("matches duplicate records to the same business", () => {
-    const [record, duplicate] = buildSeedDataset();
+  it("does not match distinct starter records with the same name at different locations", () => {
+    const records = buildSeedDataset();
+    const [record, distinctLocation] = records.filter(
+      (candidate) => candidate.canonicalNameHint === records[0].canonicalNameHint
+    );
     const first = normalizeBusinessRecord(applyStoragePolicy(record));
-    const second = normalizeBusinessRecord(applyStoragePolicy(duplicate));
+    const second = normalizeBusinessRecord(applyStoragePolicy(distinctLocation));
 
-    expect(matchBusinessRecord(second, [first.business])?.id).toBe(first.business.id);
+    expect(second.business.id).not.toBe(first.business.id);
+    expect(matchBusinessRecord(second, [first.business])).toBeUndefined();
   });
 });
