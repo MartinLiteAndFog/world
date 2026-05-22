@@ -78,7 +78,7 @@ export const OVERTURE_PLACES_STARTER_MANIFEST = {
 } as const;
 
 export type SeedSourceRecord = {
-  sourceName: "overture_places";
+  sourceName: "overture_places" | "osm";
   sourceRecordKey: string;
   sourceCategory: string;
   canonicalNameHint: string;
@@ -94,28 +94,28 @@ export type SeedSourceRecord = {
   capturedAt: string;
   payload: {
     source: {
-      release: typeof OVERTURE_PLACES_RELEASE;
-      dataset: "Overture Maps Places";
-      theme: "places";
-      type: "place";
-      license: typeof OVERTURE_PLACES_LICENSE;
-      attribution: "Overture Maps Foundation contributors";
+      release: string;
+      dataset: string;
+      theme?: string;
+      type?: string;
+      license: string;
+      attribution: string;
       recordId: string;
-      primarySourceDataset: string | null;
-      primarySourceRecordId: string | null;
-      primarySourceUpdateTime: string | null;
+      primarySourceDataset?: string | null;
+      primarySourceRecordId?: string | null;
+      primarySourceUpdateTime?: string | null;
       sourceDatasets: string[];
-      sourceLicenses: Array<typeof OVERTURE_PLACES_LICENSE>;
-    };
+      sourceLicenses: string[];
+    } & Record<string, unknown>;
     place: {
       basicCategory: string | null;
-      confidence: number | null;
-      operatingStatus: string | null;
+      confidence?: number | null;
+      operatingStatus?: string | null;
       sourceLocality: string | null;
-    };
+    } & Record<string, unknown>;
   };
 };
 
-export function buildSeedDataset(): SeedSourceRecord[] {
+export function buildOverturePlacesStarterDataset(): SeedSourceRecord[] {
   return OVERTURE_PLACES_STARTER_FIXTURE;
 }

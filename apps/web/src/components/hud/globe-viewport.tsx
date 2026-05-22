@@ -9,6 +9,10 @@ import {
   createRafHoverScheduler,
   type HoverFrameScheduler,
 } from "../../lib/globe-hover";
+import {
+  configureGlobeDepthTesting,
+  GLOBE_ENTITY_DEPTH_TEST_DISTANCE,
+} from "../../lib/globe-depth";
 import { chooseImageryStrategy } from "../../lib/globe-imagery";
 import { HUD, type CameraPosition } from "./hud-styles";
 
@@ -153,6 +157,7 @@ export default function GlobeViewport({
 
       viewer.scene.backgroundColor = Cesium.Color.fromCssColorString(HUD.colors.bg);
       viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString("#0a1628");
+      configureGlobeDepthTesting(viewer);
 
       if (viewer.scene.skyBox) viewer.scene.skyBox.show = false;
       if (viewer.scene.sun) viewer.scene.sun.show = false;
@@ -411,7 +416,7 @@ export default function GlobeViewport({
             : Cesium.Color.fromCssColorString("#f59e0b").withAlpha(0.72),
           outlineColor: Cesium.Color.fromCssColorString(HUD.colors.bg),
           outlineWidth: 2,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          disableDepthTestDistance: GLOBE_ENTITY_DEPTH_TEST_DISTANCE,
         },
         label: {
           text: country.countryName,
@@ -422,7 +427,7 @@ export default function GlobeViewport({
           outlineColor: Cesium.Color.fromCssColorString(HUD.colors.bg),
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           pixelOffset: new Cesium.Cartesian2(0, -18),
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          disableDepthTestDistance: GLOBE_ENTITY_DEPTH_TEST_DISTANCE,
           show: true,
         },
       });
@@ -445,7 +450,7 @@ export default function GlobeViewport({
             : Cesium.Color.fromCssColorString(HUD.colors.accent).withAlpha(0.5),
           outlineColor: Cesium.Color.fromCssColorString(HUD.colors.accent),
           outlineWidth: isSelected ? 2 : 1,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          disableDepthTestDistance: GLOBE_ENTITY_DEPTH_TEST_DISTANCE,
         },
         label: {
           text: item.canonicalName,
@@ -456,7 +461,7 @@ export default function GlobeViewport({
           outlineColor: Cesium.Color.fromCssColorString(HUD.colors.bg),
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           pixelOffset: new Cesium.Cartesian2(0, -12),
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          disableDepthTestDistance: GLOBE_ENTITY_DEPTH_TEST_DISTANCE,
           show: isSelected,
         },
       });

@@ -63,6 +63,9 @@ describe("fetchCountrySummaries", () => {
                 countryName: "United States",
                 businessCount: 1,
                 topCategory: "cafe",
+                categoryCounts: {
+                  cafe: 1
+                },
                 averageBusinessValueScore: 75.2,
                 centroidLatitude: 40.7128,
                 centroidLongitude: -74.006
@@ -87,6 +90,9 @@ describe("fetchCountrySummaries", () => {
         countryName: "United States",
         businessCount: 1,
         topCategory: "cafe",
+        categoryCounts: {
+          cafe: 1
+        },
         averageBusinessValueScore: 75.2,
         centroidLatitude: 40.7128,
         centroidLongitude: -74.006

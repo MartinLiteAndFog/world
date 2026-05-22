@@ -43,6 +43,7 @@ export type CountrySummary = {
   countryName: string;
   businessCount: number;
   topCategory: string | null;
+  categoryCounts: Record<string, number>;
   averageBusinessValueScore: number;
   centroidLatitude: number;
   centroidLongitude: number;
@@ -63,7 +64,7 @@ export function getApiBaseUrl(): string {
 }
 
 export async function fetchBusinesses(
-  bbox = "-75,40,-73,41"
+  bbox = "-180,-90,180,90"
 ): Promise<BusinessListItem[]> {
   const response = await fetch(`${getApiBaseUrl()}/businesses?bbox=${bbox}`, {
     cache: "no-store"

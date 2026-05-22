@@ -28,7 +28,7 @@ describe("jobs normalize flow", () => {
       "SELECT count(*)::text AS count FROM businesses"
     );
 
-    expect(Number(rawAfterSeed.rows[0].count)).toBe(200);
+    expect(Number(rawAfterSeed.rows[0].count)).toBe(100);
     expect(Number(businessesAfterSeed.rows[0].count)).toBe(0);
 
     await runNormalizeCommand();
@@ -40,7 +40,7 @@ describe("jobs normalize flow", () => {
       "SELECT count(*)::text AS count FROM business_source_links"
     );
 
-    expect(Number(businessesAfterNormalize.rows[0].count)).toBe(200);
-    expect(Number(linksAfterNormalize.rows[0].count)).toBe(200);
+    expect(Number(businessesAfterNormalize.rows[0].count)).toBe(100);
+    expect(Number(linksAfterNormalize.rows[0].count)).toBe(100);
   }, 60_000);
 });

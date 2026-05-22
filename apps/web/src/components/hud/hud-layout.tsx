@@ -12,6 +12,10 @@ import {
   type BusinessDetail,
   type CountrySummary,
 } from "../../lib/api";
+import {
+  deriveCategoryScopeCounts,
+  type CategoryScope,
+} from "../../lib/category-scope";
 import type { CameraPosition } from "./hud-styles";
 import { HUD } from "./hud-styles";
 import { TopBar } from "./top-bar";
@@ -43,18 +47,23 @@ export function HudLayout(): JSX.Element {
   const [detail, setDetail] = useState<BusinessDetail | null>(null);
   const [cameraPosition, setCameraPosition] = useState<CameraPosition>(DEFAULT_CAMERA);
   const [enabledCategories, setEnabledCategories] = useState<Set<string>>(new Set());
-  const [categoriesInitialized, setCategoriesInitialized] = useState(false);
+  const [categoryScope, setCategoryScope] = useState<CategoryScope>("global");
 
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const categories = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const item of items) {
-      const cat = item.category ?? "unknown";
-      map.set(cat, (map.get(cat) ?? 0) + 1);
-    }
-    return map;
-  }, [items]);
+    return deriveCategoryScopeCounts({
+      scope: categoryScope,
+      businesses: items,
+      countrySummaries,
+      selectedCountryCode,
+    });
+  }, [categoryScope, countrySummaries, items, selectedCountryCode]);
+
+  const categoryKey = useMemo(
+    () => Array.from(categories.keys()).sort().join("\0"),
+    [categories]
+  );
 
   const selectedCountrySummary = useMemo(
     () =>
@@ -65,10 +74,8 @@ export function HudLayout(): JSX.Element {
   );
 
   useEffect(() => {
-    if (categoriesInitialized || categories.size === 0) return;
     setEnabledCategories(new Set(categories.keys()));
-    setCategoriesInitialized(true);
-  }, [categories, categoriesInitialized]);
+  }, [categories, categoryKey]);
 
   const loadBusinesses = useCallback(async (bbox?: string) => {
     try {
@@ -157,6 +164,7 @@ export function HudLayout(): JSX.Element {
         onCountrySelect={(countryCode) => {
           setSelectedCountryCode(countryCode);
           setSelectedBusinessId(null);
+          setCategoryScope("country");
         }}
         onCameraChange={handleCameraChange}
       />
@@ -165,6 +173,9 @@ export function HudLayout(): JSX.Element {
       <LeftPanel
         categories={categories}
         enabledCategories={enabledCategories}
+        categoryScope={categoryScope}
+        selectedCountryName={selectedCountrySummary?.countryName ?? null}
+        onCategoryScopeChange={setCategoryScope}
         onToggleCategory={handleToggleCategory}
       />
       <RightPanel

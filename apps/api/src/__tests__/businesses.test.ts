@@ -48,7 +48,7 @@ describe("business query api", () => {
     const body = response.json();
 
     expect(response.statusCode).toBe(200);
-    expect(body.items).toHaveLength(200);
+    expect(body.items).toHaveLength(100);
     expect(body.items[0]).toHaveProperty("businessValueScore");
     expect(body.items[0]).not.toHaveProperty("payloadJson");
   });
@@ -65,36 +65,22 @@ describe("business query api", () => {
     );
 
     expect(response.statusCode).toBe(200);
-    expect(totalBusinessCount).toBe(200);
+    expect(totalBusinessCount).toBe(100);
     expect(body.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           countryCode: "DE",
           countryName: "Germany",
-          businessCount: 50,
-          topCategory: "bakery",
-          averageBusinessValueScore: 65.89,
-          centroidLatitude: expect.any(Number),
-          centroidLongitude: expect.any(Number)
-        }),
-        expect.objectContaining({
-          countryCode: "IL",
-          countryName: "Israel",
-          businessCount: 50,
-          topCategory: "bakery",
-          averageBusinessValueScore: 65.89,
+          businessCount: 100,
+          topCategory: "cafe",
+          categoryCounts: expect.objectContaining({
+            cafe: 14,
+            restaurant: 13,
+            ice_cream: 3
+          }),
           centroidLatitude: expect.any(Number),
           centroidLongitude: expect.any(Number)
         })
-      ])
-    );
-    expect(body.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ countryCode: "US", countryName: "United States", businessCount: 10 }),
-        expect.objectContaining({ countryCode: "JP", countryName: "Japan", businessCount: 10 }),
-        expect.objectContaining({ countryCode: "HK", countryName: "Hong Kong", businessCount: 5 }),
-        expect.objectContaining({ countryCode: "AU", countryName: "Australia", businessCount: 10 }),
-        expect.objectContaining({ countryCode: "BR", countryName: "Brazil", businessCount: 10 })
       ])
     );
   });

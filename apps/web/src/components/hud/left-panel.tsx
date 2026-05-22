@@ -3,17 +3,24 @@
 import type { CSSProperties, JSX } from "react";
 import React, { useState } from "react";
 
+import type { CategoryScope } from "../../lib/category-scope";
 import { HUD, panelBase } from "./hud-styles";
 
 interface LeftPanelProps {
   categories: Map<string, number>;
   enabledCategories: Set<string>;
+  categoryScope: CategoryScope;
+  selectedCountryName?: string | null;
+  onCategoryScopeChange: (scope: CategoryScope) => void;
   onToggleCategory: (category: string) => void;
 }
 
 export function LeftPanel({
   categories,
   enabledCategories,
+  categoryScope,
+  selectedCountryName = null,
+  onCategoryScopeChange,
   onToggleCategory,
 }: LeftPanelProps): JSX.Element {
   const [collapsed, setCollapsed] = useState(false);
@@ -35,6 +42,29 @@ export function LeftPanel({
 
       {!collapsed && (
         <div style={styles.list}>
+          <div style={styles.scopeSwitcher} aria-label="Category scope">
+            <ScopeButton
+              active={categoryScope === "global"}
+              label="GLOBAL"
+              onClick={() => onCategoryScopeChange("global")}
+            />
+            <ScopeButton
+              active={categoryScope === "country"}
+              disabled={!selectedCountryName}
+              label={selectedCountryName ? "NATIONAL" : "NATIONAL"}
+              onClick={() => onCategoryScopeChange("country")}
+            />
+            <ScopeButton
+              active={categoryScope === "viewport"}
+              label="VIEWPORT"
+              onClick={() => onCategoryScopeChange("viewport")}
+            />
+          </div>
+
+          {categoryScope === "country" && selectedCountryName && (
+            <span style={styles.scopeHint}>{selectedCountryName}</span>
+          )}
+
           {sortedCategories.map(([cat, count]) => {
             const isOn = enabledCategories.has(cat);
             return (
@@ -68,6 +98,33 @@ export function LeftPanel({
         </div>
       )}
     </aside>
+  );
+}
+
+function ScopeButton({
+  active,
+  disabled = false,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  label: string;
+  onClick: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      style={{
+        ...styles.scopeButton,
+        ...(active ? styles.scopeButtonActive : undefined),
+        ...(disabled ? styles.scopeButtonDisabled : undefined),
+      }}
+      onClick={onClick}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -111,6 +168,44 @@ const styles = {
     padding: "8px 0",
     overflowY: "auto",
     flex: 1,
+  },
+  scopeSwitcher: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "4px",
+    padding: "0 10px 8px",
+  },
+  scopeButton: {
+    padding: "5px 4px",
+    fontSize: "8px",
+    fontFamily: HUD.font,
+    fontWeight: 700,
+    letterSpacing: "0.08em",
+    background: "none",
+    color: HUD.colors.textDim,
+    border: `1px solid ${HUD.colors.border}`,
+    borderRadius: "2px",
+    cursor: "pointer",
+  },
+  scopeButtonActive: {
+    color: HUD.colors.bg,
+    background: HUD.colors.accent,
+    borderColor: HUD.colors.accent,
+  },
+  scopeButtonDisabled: {
+    color: HUD.colors.offText,
+    borderColor: HUD.colors.off,
+    cursor: "not-allowed",
+    opacity: 0.65,
+  },
+  scopeHint: {
+    display: "block",
+    padding: "0 14px 8px",
+    fontSize: "9px",
+    color: HUD.colors.textDim,
+    fontFamily: HUD.font,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
   },
   item: {
     display: "flex",
