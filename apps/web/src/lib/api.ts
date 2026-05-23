@@ -38,6 +38,26 @@ export type UnderwritingEstimate = {
   customerCountDaily?: UnderwritingCountRange;
 };
 
+export type ScoreV2FactorBreakdown = {
+  key: string;
+  label: string;
+  value: number | null;
+  dataTier: "measured" | "modeled" | "missing";
+  baseWeight: number;
+  effectiveWeight: number;
+  contributionPoints: number;
+  explanation: string;
+};
+
+export type ScoreV2Scorecard = {
+  scoreVersion: string;
+  scoreValue: number;
+  confidence: number;
+  confidenceTier: "low" | "medium" | "high";
+  factorBreakdown: ScoreV2FactorBreakdown[];
+  whyThisScore: string;
+};
+
 export type BusinessDetail = {
   business: {
     id: string;
@@ -65,7 +85,52 @@ export type BusinessDetail = {
     scoreValue: number;
     factorBreakdown: Array<{ key: string; label: string; value: number }>;
   };
+  scorecardV2?: ScoreV2Scorecard;
   underwriting?: UnderwritingEstimate;
+};
+
+export type AnalysisLayer = "basic" | "plus" | "online";
+
+export type AnalysisBadge =
+  | "NEW"
+  | "VERIFIED"
+  | "ASSUMPTION UPDATED"
+  | "GAP";
+
+export type AnalysisSection =
+  | "facts"
+  | "source"
+  | "competition"
+  | "seasonality"
+  | "underwriting"
+  | "score";
+
+export type AnalysisEntry = {
+  id: string;
+  section: AnalysisSection;
+  badge: AnalysisBadge;
+  title: string;
+  detail: string;
+  sources?: string[];
+};
+
+export type ScoreV2Preview = {
+  modelVersion: string;
+  score: number;
+  confidence: number;
+  confidenceTier: "low" | "medium" | "high";
+  factors: ScoreV2FactorBreakdown[];
+};
+
+export type BusinessAnalysis = {
+  available: boolean;
+  layer: "plus" | "online";
+  status: "ready" | "unavailable";
+  modelVersion: string;
+  generatedAt: string;
+  entries: AnalysisEntry[];
+  scoreV2Preview?: ScoreV2Preview;
+  unavailableReason?: string;
 };
 
 export type CountrySummary = {
@@ -135,4 +200,25 @@ export async function fetchBusinessDetail(id: string): Promise<BusinessDetail> {
   }
 
   return (await response.json()) as BusinessDetail;
+}
+
+
+export async function fetchBusinessAnalysis(
+  id: string,
+  layer: Exclude<AnalysisLayer, "basic"> = "plus"
+): Promise<BusinessAnalysis> {
+  const response = await fetch(
+    `${getApiBaseUrl()}/businesses/${id}/analysis?layer=${layer}`,
+    { cache: "no-store" }
+  );
+
+  if (response.status === 501) {
+    return (await response.json()) as BusinessAnalysis;
+  }
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch business analysis");
+  }
+
+  return (await response.json()) as BusinessAnalysis;
 }

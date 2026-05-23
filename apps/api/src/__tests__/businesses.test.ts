@@ -173,6 +173,93 @@ describe("business query api", () => {
     expect(body.underwriting.dueDiligenceMissing.length).toBeGreaterThan(0);
   });
 
+  it("GET /businesses/:id/analysis?layer=plus returns a deterministic plus result for Early Bird", async () => {
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/businesses?bbox=-180,-90,180,90"
+    });
+    const listBody = listResponse.json();
+    const earlyBird = listBody.items.find(
+      (item: { canonicalName: string; category: string | null }) =>
+        item.canonicalName === "Early Bird" && item.category === "ice_cream"
+    );
+
+    expect(earlyBird).toBeDefined();
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/businesses/${earlyBird.id}/analysis?layer=plus`
+    });
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(body.layer).toBe("plus");
+    expect(body.status).toBe("ready");
+    expect(body.available).toBe(true);
+    expect(body.modelVersion).toBe("plus_v0_local");
+    expect(Array.isArray(body.entries)).toBe(true);
+    expect(body.entries.length).toBeGreaterThan(0);
+
+    const badges = new Set<string>(body.entries.map((entry: { badge: string }) => entry.badge));
+    expect(badges.has("VERIFIED")).toBe(true);
+    expect(badges.has("NEW")).toBe(true);
+    expect(badges.has("GAP")).toBe(true);
+
+    expect(body.scoreV2Preview).toBeDefined();
+    expect(body.scoreV2Preview.modelVersion).toBe("score_v2");
+    expect(body.scoreV2Preview.score).toBeGreaterThan(0);
+  });
+
+  it("GET /businesses/:id/analysis?layer=online returns an honest 501 unavailable state", async () => {
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/businesses?bbox=-180,-90,180,90"
+    });
+    const listBody = listResponse.json();
+    const anyBusinessId = listBody.items[0]?.id;
+    expect(anyBusinessId).toBeDefined();
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/businesses/${anyBusinessId}/analysis?layer=online`
+    });
+    const body = response.json();
+
+    expect(response.statusCode).toBe(501);
+    expect(body.available).toBe(false);
+    expect(body.layer).toBe("online");
+    expect(body.status).toBe("unavailable");
+    expect(body.entries).toEqual([]);
+    expect(body.unavailableReason).toMatch(/not implemented/i);
+  });
+
+  it("GET /businesses/:id/analysis for an unsupported underwriting category still emits VERIFIED + NEW entries", async () => {
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/businesses?bbox=-180,-90,180,90"
+    });
+    const listBody = listResponse.json();
+    const pharmacy = listBody.items.find(
+      (item: { category: string | null }) => item.category === "pharmacy"
+    );
+
+    expect(pharmacy).toBeDefined();
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/businesses/${pharmacy.id}/analysis?layer=plus`
+    });
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(body.available).toBe(true);
+    const badges = new Set<string>(body.entries.map((entry: { badge: string }) => entry.badge));
+    expect(badges.has("VERIFIED")).toBe(true);
+    expect(badges.has("NEW")).toBe(true);
+    expect(badges.has("GAP")).toBe(true);
+    expect(badges.has("ASSUMPTION UPDATED")).toBe(false);
+  });
+
   it("allows browser reads from the web dev origin", async () => {
     const response = await app.inject({
       method: "GET",

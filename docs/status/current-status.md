@@ -2,6 +2,55 @@
 
 This document tracks the current working state of the project. It is intentionally separate from original plans and design documents, which should remain unchanged.
 
+## 2026-05-23 - Plus analysis slice (Analyze button + layer ladder)
+
+### Current Goal
+
+Add the missing intel-card `► ANALYZE` flow and the BASIC / PLUS / ONLINE layer ladder so we can present source-backed Plus intel for Early Bird without external LLM/search/API keys. ONLINE remains unimplemented and is surfaced honestly.
+
+### Completed
+
+- Added the deterministic `plus_v0_local` analyzer under `apps/api/src/lib/analysis/plus-analyzer.ts`. It assembles `VERIFIED`, `NEW`, `ASSUMPTION UPDATED`, and `GAP` entries from local DB facts, the v0 underwriting model, and OSM-fixture-style competitor context, and exposes a `scoreV2Preview` via `scoreBusinessV2`. No network calls, no LLM dependency.
+- Added the `GET /businesses/:id/analysis?layer=plus|online` route. `plus` returns the deterministic analysis (with a PostGIS `ST_DWithin` competitor count). `online` returns `501` with an honest unavailable shape (`online_v0_not_implemented`).
+- Added `fetchBusinessAnalysis` to the web API client with matching `BusinessAnalysis` / `AnalysisBadge` / `AnalysisEntry` / `ScoreV2Preview` types.
+- Added the `► ANALYZE` → `ANALYZING...` → `✓ PLUS APPLIED` flow to the right-panel intel card. The Basic block (FACTS, MODELED REVENUE/COSTS/DEMAND, DUE DILIGENCE, METHODOLOGY) still renders by default; Analyze adds a Plus block below with `NEW`, `VERIFIED`, `ASSUMPTION UPDATED`, `GAP` badges and the score v2 preview.
+- Added a layer ladder `BASIC › PLUS › ONLINE`, with `ONLINE` permanently marked unavailable via `data-layer-state="unavailable"`.
+- Wired `HudLayout` to drive `analysisState` and call the API on Analyze click; state resets when the selected business changes.
+- Added `@street-stocks/scoring` as a dependency of `@street-stocks/api` so the analyzer can reuse the existing pure score-v2 core.
+
+### Changed Files
+
+- `apps/api/package.json` (+ `@street-stocks/scoring` workspace dep)
+- `apps/api/src/__tests__/businesses.test.ts` (DB-backed integration assertions for `/businesses/:id/analysis` — runs only when local PostGIS is up)
+- `apps/api/src/lib/analysis/plus-analyzer.ts` (new)
+- `apps/api/src/lib/analysis/__tests__/plus-analyzer.test.ts` (new)
+- `apps/api/src/routes/business-detail.ts` (new `/businesses/:id/analysis` route + competitor SQL)
+- `apps/api/src/routes/__tests__/business-detail-online.test.ts` (new, DB-free assertion of the online unavailable shape)
+- `apps/web/src/lib/api.ts` (`fetchBusinessAnalysis` + analysis types)
+- `apps/web/src/components/hud/right-panel.tsx` (Analyze control, layer ladder, Plus block, badge styles)
+- `apps/web/src/components/hud/hud-layout.tsx` (analysis state machine + reset on selection change)
+- `apps/web/src/__tests__/right-panel.test.tsx` (analysis flow / badge / unavailable tests)
+- `pnpm-lock.yaml`
+
+### Verification
+
+- TDD red → green: pure analyzer tests, route online-unavailable tests, and right-panel state tests all started red, then green.
+- Focused API tests (no Docker required): `apps/api` excluding `e2e-smoke.test.ts` and the DB-backed `businesses.test.ts` → **21 passed**. Includes `plus-analyzer.test.ts` (10) and `business-detail-online.test.ts` (1).
+- Web test suite: **41 passed (9 files)** including the new analyze flow tests.
+- Scoring package: **10 passed**.
+- `pnpm lint`: **8/8 tasks** green (turbo cached after the first run).
+- `pnpm build`: **8/8 tasks** green; Next.js production build green.
+- `pnpm --filter @street-stocks/api test` was **not run end-to-end** here because the DB-backed `businesses.test.ts` and `e2e-smoke.test.ts` require Docker / local PostGIS, which is unavailable in this sandbox. The new analysis assertions added to `businesses.test.ts` are exercised when PostGIS is up locally / in CI.
+- GitNexus `impact()` upstream on `registerBusinessDetailRoutes`, `estimateBusinessUnderwriting`, `RightPanel`, and `HudLayout` was **LOW** risk (additive changes, no symbol renames, no behavior change for existing callers).
+- GitNexus `detect_changes` reported 23 changed symbols across 9 files with `risk_level: medium`. All affected processes are existing HudLayout flows whose inputs are unchanged; the medium rating reflects the breadth of additive edits, not behavior changes.
+
+### Remaining Work
+
+- Persist OSM tags (`opening_hours`, seating, website) to upgrade VERIFIED entries from address/category/geohash to richer facts.
+- Move competitor density from per-request SQL to a precomputed context table when the seed grows beyond the Winsstraße fixture.
+- Calibrate the seasonality / dual-format heuristic against real POS once available.
+- Implement the `online` layer (LLM + web search) — currently intentionally `501`.
+
 ## 2026-05-22 - Score v2 Pure Scoring Slice
 
 ### Current Goal

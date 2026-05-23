@@ -4,6 +4,9 @@ import type { CSSProperties, JSX } from "react";
 import React from "react";
 
 import type {
+  AnalysisBadge,
+  AnalysisEntry,
+  BusinessAnalysis,
   BusinessDetail,
   CountrySummary,
   UnderwritingCountRange,
@@ -12,16 +15,24 @@ import type {
 } from "../../lib/api";
 import { HUD, panelBase } from "./hud-styles";
 
+export type AnalysisState = "idle" | "loading" | "ready" | "error" | "unavailable";
+
 interface RightPanelProps {
   detail: BusinessDetail | null;
   countrySummary?: CountrySummary | null;
   countrySummaries?: CountrySummary[];
+  analysisState?: AnalysisState;
+  analysis?: BusinessAnalysis | null;
+  onAnalyze?: () => void;
 }
 
 export function RightPanel({
   detail,
   countrySummary = null,
   countrySummaries = [],
+  analysisState = "idle",
+  analysis = null,
+  onAnalyze,
 }: RightPanelProps): JSX.Element {
   if (!detail) {
     if (countrySummary) {
@@ -125,6 +136,11 @@ export function RightPanel({
             <span style={styles.scoreVersion}>v{scorecard.scoreVersion}</span>
           </div>
 
+          <AnalyzeControl
+            analysisState={analysisState}
+            onAnalyze={onAnalyze}
+          />
+
           {scorecard.factorBreakdown.length > 0 && (
             <div style={styles.factors}>
               {scorecard.factorBreakdown.map((factor) => (
@@ -139,6 +155,13 @@ export function RightPanel({
 
         <div style={styles.divider} />
 
+        <LayerLadder
+          currentLayer={analysis?.layer ?? "basic"}
+          analysisState={analysisState}
+        />
+
+        <div style={styles.divider} />
+
         <FactsSection location={location} />
 
         {underwriting && (
@@ -147,9 +170,250 @@ export function RightPanel({
             <UnderwritingSections underwriting={underwriting} />
           </>
         )}
+
+        {analysis && (
+          <>
+            <div style={styles.divider} />
+            <PlusAnalysisSection analysis={analysis} state={analysisState} />
+          </>
+        )}
       </div>
     </aside>
   );
+}
+
+function AnalyzeControl({
+  analysisState,
+  onAnalyze,
+}: {
+  analysisState: AnalysisState;
+  onAnalyze?: () => void;
+}): JSX.Element {
+  if (analysisState === "loading") {
+    return (
+      <span style={styles.analyzeStatus} aria-busy="true">
+        ANALYZING...
+      </span>
+    );
+  }
+
+  if (analysisState === "ready") {
+    return <span style={styles.analyzeApplied}>✓ PLUS APPLIED</span>;
+  }
+
+  if (analysisState === "error") {
+    return (
+      <button
+        type="button"
+        style={styles.analyzeButton}
+        onClick={onAnalyze}
+      >
+        ► ANALYZE (retry)
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      style={styles.analyzeButton}
+      onClick={onAnalyze}
+      disabled={!onAnalyze}
+    >
+      ► ANALYZE
+    </button>
+  );
+}
+
+function LayerLadder({
+  currentLayer,
+  analysisState,
+}: {
+  currentLayer: "basic" | "plus" | "online";
+  analysisState: AnalysisState;
+}): JSX.Element {
+  const ladder: Array<{
+    id: "basic" | "plus" | "online";
+    label: string;
+    state: "active" | "available" | "unavailable" | "loading";
+  }> = [
+    { id: "basic", label: "BASIC", state: "active" },
+    {
+      id: "plus",
+      label: "PLUS",
+      state:
+        analysisState === "loading"
+          ? "loading"
+          : currentLayer === "plus" && analysisState === "ready"
+            ? "active"
+            : "available",
+    },
+    { id: "online", label: "ONLINE", state: "unavailable" },
+  ];
+
+  return (
+    <div style={styles.section}>
+      <span style={styles.sectionTitle}>LAYERS</span>
+      <div style={styles.ladderRow}>
+        {ladder.map((layer, index) => (
+          <React.Fragment key={layer.id}>
+            <span
+              data-layer-id={layer.id}
+              data-layer-state={layer.state}
+              style={layerChipStyle(layer.state)}
+            >
+              {layer.label}
+            </span>
+            {index < ladder.length - 1 && (
+              <span style={styles.ladderConnector}>›</span>
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PlusAnalysisSection({
+  analysis,
+  state,
+}: {
+  analysis: BusinessAnalysis;
+  state: AnalysisState;
+}): JSX.Element {
+  if (!analysis.available || analysis.status === "unavailable") {
+    return (
+      <div style={styles.section}>
+        <span style={styles.sectionTitle}>
+          {analysis.layer === "online" ? "ONLINE INTEL" : "PLUS INTEL"}
+        </span>
+        <span style={styles.unavailableBadge}>
+          UNAVAILABLE · {analysis.modelVersion}
+        </span>
+        {analysis.unavailableReason && (
+          <span style={styles.detailMuted}>{analysis.unavailableReason}</span>
+        )}
+      </div>
+    );
+  }
+
+  if (state === "loading") {
+    return (
+      <div style={styles.section}>
+        <span style={styles.sectionTitle}>PLUS INTEL</span>
+        <span style={styles.detailMuted}>Running deterministic local analysis…</span>
+      </div>
+    );
+  }
+
+  const grouped = groupEntriesBySection(analysis.entries);
+
+  return (
+    <div style={styles.section}>
+      <span style={styles.sectionTitle}>PLUS INTEL</span>
+      <span style={styles.modeledBadge}>{analysis.modelVersion}</span>
+
+      {grouped.map(({ sectionTitle, entries }) => (
+        <div key={sectionTitle} style={styles.plusGroup}>
+          <span style={styles.plusGroupTitle}>{sectionTitle}</span>
+          {entries.map((entry) => (
+            <PlusEntryRow key={entry.id} entry={entry} />
+          ))}
+        </div>
+      ))}
+
+      {analysis.scoreV2Preview && (
+        <div style={styles.plusGroup}>
+          <span style={styles.plusGroupTitle}>SCORE V2 PREVIEW</span>
+          <div style={styles.scoreBlock}>
+            <span style={styles.scoreValue}>{analysis.scoreV2Preview.score}</span>
+            <span style={styles.scoreVersion}>
+              {analysis.scoreV2Preview.modelVersion}
+            </span>
+          </div>
+          <span style={styles.detailMuted}>
+            {analysis.scoreV2Preview.confidenceTier.toUpperCase()} CONFIDENCE · preview only,
+            not persisted
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlusEntryRow({ entry }: { entry: AnalysisEntry }): JSX.Element {
+  return (
+    <div style={styles.plusEntry}>
+      <div style={styles.plusEntryHeader}>
+        <span style={badgeStyleFor(entry.badge)}>{entry.badge}</span>
+        <span style={styles.plusEntryTitle}>{entry.title}</span>
+      </div>
+      <span style={styles.detailText}>{entry.detail}</span>
+      {entry.sources && entry.sources.length > 0 && (
+        <span style={styles.detailMuted}>
+          SOURCES: {entry.sources.join(" · ")}
+        </span>
+      )}
+    </div>
+  );
+}
+
+const SECTION_TITLE_BY_KEY: Record<string, string> = {
+  source: "SOURCE",
+  facts: "FACTS",
+  competition: "MODELED COMPETITION",
+  seasonality: "SEASONALITY",
+  underwriting: "UNDERWRITING",
+  score: "SCORE",
+};
+
+function groupEntriesBySection(entries: AnalysisEntry[]): Array<{
+  sectionTitle: string;
+  entries: AnalysisEntry[];
+}> {
+  const groups = new Map<string, AnalysisEntry[]>();
+  for (const entry of entries) {
+    const title = SECTION_TITLE_BY_KEY[entry.section] ?? entry.section.toUpperCase();
+    const bucket = groups.get(title);
+    if (bucket) {
+      bucket.push(entry);
+    } else {
+      groups.set(title, [entry]);
+    }
+  }
+
+  return Array.from(groups.entries()).map(([sectionTitle, entries]) => ({
+    sectionTitle,
+    entries,
+  }));
+}
+
+function badgeStyleFor(badge: AnalysisBadge): CSSProperties {
+  switch (badge) {
+    case "NEW":
+      return styles.badgeNew;
+    case "VERIFIED":
+      return styles.badgeVerified;
+    case "ASSUMPTION UPDATED":
+      return styles.badgeAssumption;
+    case "GAP":
+      return styles.badgeGap;
+    default:
+      return styles.badgeVerified;
+  }
+}
+
+function layerChipStyle(state: "active" | "available" | "unavailable" | "loading"): CSSProperties {
+  switch (state) {
+    case "active":
+      return { ...styles.ladderChip, ...styles.ladderChipActive };
+    case "loading":
+      return { ...styles.ladderChip, ...styles.ladderChipLoading };
+    case "unavailable":
+      return { ...styles.ladderChip, ...styles.ladderChipUnavailable };
+    default:
+      return styles.ladderChip;
+  }
 }
 
 function FactsSection({ location }: { location: BusinessDetail["location"] }): JSX.Element {
@@ -420,6 +684,39 @@ const styles = {
     color: HUD.colors.textDim,
     fontFamily: HUD.font,
   },
+  analyzeButton: {
+    alignSelf: "flex-start",
+    padding: "4px 10px",
+    border: `1px solid ${HUD.colors.accent}`,
+    background: "transparent",
+    color: HUD.colors.accent,
+    fontFamily: HUD.font,
+    fontSize: "10px",
+    letterSpacing: "0.14em",
+    textTransform: "uppercase",
+    cursor: "pointer",
+  },
+  analyzeStatus: {
+    alignSelf: "flex-start",
+    padding: "4px 10px",
+    border: `1px dashed ${HUD.colors.accent}`,
+    color: HUD.colors.accent,
+    fontFamily: HUD.font,
+    fontSize: "10px",
+    letterSpacing: "0.14em",
+    textTransform: "uppercase",
+  },
+  analyzeApplied: {
+    alignSelf: "flex-start",
+    padding: "4px 10px",
+    border: `1px solid ${HUD.colors.accent}`,
+    background: HUD.colors.accentGlow,
+    color: HUD.colors.textBright,
+    fontFamily: HUD.font,
+    fontSize: "10px",
+    letterSpacing: "0.14em",
+    textTransform: "uppercase",
+  },
   factors: {
     display: "flex",
     flexDirection: "column",
@@ -481,6 +778,100 @@ const styles = {
     fontSize: "9px",
     letterSpacing: "0.12em",
     textTransform: "uppercase",
+  },
+  ladderRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    flexWrap: "wrap",
+  },
+  ladderChip: {
+    padding: "2px 8px",
+    border: `1px solid ${HUD.colors.border}`,
+    color: HUD.colors.textDim,
+    fontFamily: HUD.font,
+    fontSize: "10px",
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+  },
+  ladderChipActive: {
+    borderColor: HUD.colors.accent,
+    color: HUD.colors.textBright,
+  },
+  ladderChipLoading: {
+    borderColor: HUD.colors.accent,
+    color: HUD.colors.accent,
+  },
+  ladderChipUnavailable: {
+    borderStyle: "dashed",
+    color: HUD.colors.textDim,
+  },
+  ladderConnector: {
+    color: HUD.colors.textDim,
+    fontFamily: HUD.font,
+    fontSize: "10px",
+  },
+  plusGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+    marginTop: "8px",
+  },
+  plusGroupTitle: {
+    fontSize: "10px",
+    letterSpacing: "0.12em",
+    color: HUD.colors.accent,
+    fontFamily: HUD.font,
+  },
+  plusEntry: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "3px",
+    padding: "6px 0",
+    borderTop: `1px dashed ${HUD.colors.border}`,
+  },
+  plusEntryHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  },
+  plusEntryTitle: {
+    fontSize: "11px",
+    color: HUD.colors.textBright,
+    fontFamily: HUD.font,
+    fontWeight: 700,
+  },
+  badgeNew: {
+    padding: "1px 5px",
+    border: `1px solid ${HUD.colors.accent}`,
+    color: HUD.colors.accent,
+    fontFamily: HUD.font,
+    fontSize: "9px",
+    letterSpacing: "0.12em",
+  },
+  badgeVerified: {
+    padding: "1px 5px",
+    border: `1px solid ${HUD.colors.textBright}`,
+    color: HUD.colors.textBright,
+    fontFamily: HUD.font,
+    fontSize: "9px",
+    letterSpacing: "0.12em",
+  },
+  badgeAssumption: {
+    padding: "1px 5px",
+    border: `1px dashed ${HUD.colors.accent}`,
+    color: HUD.colors.accent,
+    fontFamily: HUD.font,
+    fontSize: "9px",
+    letterSpacing: "0.12em",
+  },
+  badgeGap: {
+    padding: "1px 5px",
+    border: `1px dashed ${HUD.colors.textDim}`,
+    color: HUD.colors.textDim,
+    fontFamily: HUD.font,
+    fontSize: "9px",
+    letterSpacing: "0.12em",
   },
   emptyState: {
     display: "flex",

@@ -6,12 +6,15 @@ import dynamic from "next/dynamic";
 
 import {
   fetchBusinesses,
+  fetchBusinessAnalysis,
   fetchBusinessDetail,
   fetchCountrySummaries,
+  type BusinessAnalysis,
   type BusinessListItem,
   type BusinessDetail,
   type CountrySummary,
 } from "../../lib/api";
+import type { AnalysisState } from "./right-panel";
 import {
   deriveCategoryScopeCounts,
   type CategoryScope,
@@ -48,6 +51,8 @@ export function HudLayout(): JSX.Element {
   const [cameraPosition, setCameraPosition] = useState<CameraPosition>(DEFAULT_CAMERA);
   const [enabledCategories, setEnabledCategories] = useState<Set<string>>(new Set());
   const [categoryScope, setCategoryScope] = useState<CategoryScope>("global");
+  const [analysis, setAnalysis] = useState<BusinessAnalysis | null>(null);
+  const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
 
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -120,14 +125,37 @@ export function HudLayout(): JSX.Element {
   useEffect(() => {
     if (!selectedBusinessId) {
       setDetail(null);
+      setAnalysis(null);
+      setAnalysisState("idle");
       return;
     }
+    setAnalysis(null);
+    setAnalysisState("idle");
     void (async () => {
       try {
         const d = await fetchBusinessDetail(selectedBusinessId);
         setDetail(d);
       } catch {
         setDetail(null);
+      }
+    })();
+  }, [selectedBusinessId]);
+
+  const handleAnalyze = useCallback(() => {
+    if (!selectedBusinessId) {
+      return;
+    }
+    setAnalysisState("loading");
+    void (async () => {
+      try {
+        const result = await fetchBusinessAnalysis(selectedBusinessId, "plus");
+        setAnalysis(result);
+        setAnalysisState(
+          result.available && result.status === "ready" ? "ready" : "unavailable"
+        );
+      } catch {
+        setAnalysis(null);
+        setAnalysisState("error");
       }
     })();
   }, [selectedBusinessId]);
@@ -182,6 +210,9 @@ export function HudLayout(): JSX.Element {
         detail={detail}
         countrySummary={selectedCountrySummary}
         countrySummaries={countrySummaries}
+        analysisState={analysisState}
+        analysis={analysis}
+        onAnalyze={handleAnalyze}
       />
       <BottomBar cameraPosition={cameraPosition} />
     </div>
