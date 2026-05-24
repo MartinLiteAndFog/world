@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -314,6 +314,83 @@ describe("RightPanel underwriting intel card", () => {
 
     expect(screen.getByText(/SCORE V2 PREVIEW/i)).toBeInTheDocument();
     expect(screen.getByText("62")).toBeInTheDocument();
+  });
+
+  it("surfaces compact Plus insights above Basic facts after analysis is applied", () => {
+    const analysis: BusinessAnalysis = {
+      available: true,
+      layer: "plus",
+      status: "ready",
+      modelVersion: "plus_v0_local",
+      generatedAt: "2026-05-23T19:00:00.000Z",
+      entries: [
+        {
+          id: "verified.source.osm",
+          section: "source",
+          badge: "VERIFIED",
+          title: "OSM source verified",
+          detail:
+            "Business identity sourced from an OpenStreetMap node record (ODbL-1.0).",
+          sources: ["OpenStreetMap"]
+        },
+        {
+          id: "new.modeled_competition",
+          section: "competition",
+          badge: "NEW",
+          title: "Modeled competition",
+          detail: "99 POIs within 1 km (14 cafe, 13 restaurant, 8 specialty_food, 7 bakery).",
+          sources: ["local OSM fixture"]
+        },
+        {
+          id: "assumption.seasonality_narrows_range",
+          section: "underwriting",
+          badge: "ASSUMPTION UPDATED",
+          title: "Modeled revenue assumption narrowed",
+          detail:
+            "Peak-month assumption shifts modeled daily revenue toward the upper half of the range.",
+          sources: ["v0_open_priors"]
+        },
+        {
+          id: "gap.actual_pos_till_sales_12_trailing_months",
+          section: "underwriting",
+          badge: "GAP",
+          title: "Due diligence gap",
+          detail: "actual POS / till sales (12 trailing months)"
+        }
+      ],
+      scoreV2Preview: {
+        modelVersion: "score_v2",
+        score: 62,
+        confidence: 0.7,
+        confidenceTier: "medium",
+        factors: []
+      }
+    };
+
+    render(
+      React.createElement(RightPanel as React.ComponentType<any>, {
+        detail: earlyBirdDetail,
+        analysisState: "ready",
+        analysis
+      })
+    );
+
+    const plusInsights = screen.getByText("PLUS INSIGHTS");
+    const facts = screen.getByText("FACTS");
+    const plusInsightsSection = plusInsights.closest("div");
+
+    expect(plusInsightsSection).not.toBeNull();
+
+    expect(plusInsights.compareDocumentPosition(facts)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(screen.queryByText("vv1")).not.toBeInTheDocument();
+    expect(screen.getByText(/Basic score v1 · Plus score preview: 62/i)).toBeInTheDocument();
+    expect(within(plusInsightsSection as HTMLElement).getByText("NEW competition")).toBeInTheDocument();
+    expect(within(plusInsightsSection as HTMLElement).getByText(/99 POIs within 1 km/i)).toBeInTheDocument();
+    expect(within(plusInsightsSection as HTMLElement).getByText("ASSUMPTION UPDATED seasonality")).toBeInTheDocument();
+    expect(within(plusInsightsSection as HTMLElement).getByText("SCORE V2 PREVIEW")).toBeInTheDocument();
+    expect(within(plusInsightsSection as HTMLElement).getByText("GAPS REMAIN")).toBeInTheDocument();
   });
 
   it("surfaces the honest unavailable state when the online layer is requested", () => {

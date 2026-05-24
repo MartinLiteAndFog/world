@@ -131,15 +131,24 @@ export function RightPanel({
 
         <div style={styles.section}>
           <div style={styles.scoreBlock}>
-            <span style={styles.scoreLabel}>SCORE</span>
+            <span style={styles.scoreLabel}>BASIC SCORE</span>
             <span style={styles.scoreValue}>{scorecard.scoreValue}</span>
-            <span style={styles.scoreVersion}>v{scorecard.scoreVersion}</span>
+            <span style={styles.scoreVersion}>
+              {formatScoreVersion(scorecard.scoreVersion)}
+            </span>
           </div>
 
           <AnalyzeControl
             analysisState={analysisState}
             onAnalyze={onAnalyze}
           />
+
+          {analysis?.available && analysis.status === "ready" && analysis.scoreV2Preview && (
+            <span style={styles.scoreComparison}>
+              Basic score {formatScoreVersion(scorecard.scoreVersion)} · Plus score preview:{" "}
+              {analysis.scoreV2Preview.score}
+            </span>
+          )}
 
           {scorecard.factorBreakdown.length > 0 && (
             <div style={styles.factors}>
@@ -159,6 +168,13 @@ export function RightPanel({
           currentLayer={analysis?.layer ?? "basic"}
           analysisState={analysisState}
         />
+
+        {analysis?.available && analysis.status === "ready" && (
+          <>
+            <div style={styles.divider} />
+            <PlusInsightsSummary analysis={analysis} />
+          </>
+        )}
 
         <div style={styles.divider} />
 
@@ -180,6 +196,76 @@ export function RightPanel({
       </div>
     </aside>
   );
+}
+
+type PlusInsightRow = {
+  label: string;
+  detail: string;
+};
+
+function PlusInsightsSummary({
+  analysis
+}: {
+  analysis: BusinessAnalysis;
+}): JSX.Element {
+  const rows = buildPlusInsightRows(analysis);
+
+  return (
+    <div style={styles.plusInsightsSection}>
+      <span style={styles.sectionTitle}>PLUS INSIGHTS</span>
+      {rows.map((row) => (
+        <div key={row.label} style={styles.plusInsightRow}>
+          <span style={styles.plusInsightLabel}>{row.label}</span>
+          <span style={styles.detailText}>{row.detail}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function buildPlusInsightRows(analysis: BusinessAnalysis): PlusInsightRow[] {
+  const rows: PlusInsightRow[] = [];
+  const competitionEntry =
+    analysis.entries.find(
+      (entry) => entry.badge === "NEW" && entry.section === "competition"
+    ) ??
+    analysis.entries.find(
+      (entry) => entry.badge === "NEW" && entry.section !== "facts" && entry.section !== "source"
+    );
+  const assumptionEntry =
+    analysis.entries.find((entry) => entry.badge === "ASSUMPTION UPDATED") ??
+    analysis.entries.find((entry) => entry.section === "seasonality");
+  const gapEntries = analysis.entries.filter((entry) => entry.badge === "GAP");
+
+  if (competitionEntry) {
+    rows.push({
+      label: "NEW competition",
+      detail: competitionEntry.detail
+    });
+  }
+
+  if (assumptionEntry) {
+    rows.push({
+      label: "ASSUMPTION UPDATED seasonality",
+      detail: assumptionEntry.detail
+    });
+  }
+
+  if (analysis.scoreV2Preview) {
+    rows.push({
+      label: "SCORE V2 PREVIEW",
+      detail: `${analysis.scoreV2Preview.score} · ${analysis.scoreV2Preview.confidenceTier.toUpperCase()} confidence · deterministic local preview`
+    });
+  }
+
+  if (gapEntries.length > 0) {
+    rows.push({
+      label: "GAPS REMAIN",
+      detail: `${gapEntries.length} due-diligence ${gapEntries.length === 1 ? "gap" : "gaps"}: ${gapEntries[0].detail}`
+    });
+  }
+
+  return rows.slice(0, 4);
 }
 
 function AnalyzeControl({
@@ -324,7 +410,7 @@ function PlusAnalysisSection({
 
       {analysis.scoreV2Preview && (
         <div style={styles.plusGroup}>
-          <span style={styles.plusGroupTitle}>SCORE V2 PREVIEW</span>
+          <span style={styles.plusGroupTitle}>SCORE V2 DETAILS</span>
           <div style={styles.scoreBlock}>
             <span style={styles.scoreValue}>{analysis.scoreV2Preview.score}</span>
             <span style={styles.scoreVersion}>
@@ -577,6 +663,10 @@ function formatCountRange(range: UnderwritingCountRange, noun: string): string {
   return `${fmt.format(range.low)}–${fmt.format(range.high)} ${noun} / day`;
 }
 
+function formatScoreVersion(version: string): string {
+  return version.startsWith("v") ? version : `v${version}`;
+}
+
 function formatBusinessCount(count: number): string {
   return `${count} ${count === 1 ? "BUSINESS" : "BUSINESSES"}`;
 }
@@ -683,6 +773,12 @@ const styles = {
     fontSize: "10px",
     color: HUD.colors.textDim,
     fontFamily: HUD.font,
+  },
+  scoreComparison: {
+    fontSize: "10px",
+    color: HUD.colors.textBright,
+    fontFamily: HUD.font,
+    lineHeight: 1.4,
   },
   analyzeButton: {
     alignSelf: "flex-start",
@@ -822,6 +918,29 @@ const styles = {
     letterSpacing: "0.12em",
     color: HUD.colors.accent,
     fontFamily: HUD.font,
+  },
+  plusInsightsSection: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    padding: "8px",
+    border: `1px solid ${HUD.colors.accent}`,
+    background: HUD.colors.accentGlow,
+  },
+  plusInsightRow: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "3px",
+    paddingTop: "6px",
+    borderTop: `1px dashed ${HUD.colors.border}`,
+  },
+  plusInsightLabel: {
+    fontSize: "10px",
+    letterSpacing: "0.1em",
+    color: HUD.colors.textBright,
+    fontFamily: HUD.font,
+    fontWeight: 700,
+    textTransform: "uppercase",
   },
   plusEntry: {
     display: "flex",

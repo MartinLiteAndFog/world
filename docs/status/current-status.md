@@ -2,6 +2,37 @@
 
 This document tracks the current working state of the project. It is intentionally separate from original plans and design documents, which should remain unchanged.
 
+## 2026-05-24 - Plus insights visibility fix
+
+### Current Goal
+
+Make the result of clicking `► ANALYZE` immediately obvious in the Street Stocks intel card. The previous Plus implementation did return local deterministic Plus data, but the valuable section rendered below Basic facts and modeled underwriting, so the deployed card still looked like the old Basic/v1 result at the top.
+
+### Completed
+
+- Added a compact `PLUS INSIGHTS` summary directly below the BASIC / PLUS / ONLINE layer ladder and before Basic `FACTS`.
+- The summary surfaces up to four high-value local Plus rows: `NEW competition`, `ASSUMPTION UPDATED seasonality`, `SCORE V2 PREVIEW`, and `GAPS REMAIN`.
+- Added an inline score note under `✓ PLUS APPLIED`: `Basic score v1 · Plus score preview: <score>`, so the top score remains clearly labeled as Basic/v1 while the Plus score is shown as a preview.
+- Fixed the score-version label bug where `scoreVersion: "v1"` rendered as `vv1`.
+- Kept the full `PLUS INTEL` details lower in the panel for drill-down.
+
+### Changed Files
+
+- `apps/web/src/components/hud/right-panel.tsx`
+- `apps/web/src/__tests__/right-panel.test.tsx`
+- `docs/status/current-status.md`
+
+### Verification
+
+- Red/green regression: `pnpm --filter @street-stocks/web exec vitest run src/__tests__/right-panel.test.tsx` now passes 10/10 and asserts `PLUS INSIGHTS` appears before `FACTS`.
+- Web suite: `pnpm --filter @street-stocks/web test` passed 42/42 tests across 9 files.
+- API focused Plus checks: `pnpm --filter @street-stocks/api exec vitest run src/lib/analysis/__tests__/plus-analyzer.test.ts src/routes/__tests__/business-detail-online.test.ts` passed 11/11 tests.
+
+### Deploy / Commit Status
+
+- Not committed or pushed per instruction.
+- A commit and redeploy are needed for production to show the new visible Plus summary.
+
 ## 2026-05-23 - Plus analysis slice (Analyze button + layer ladder)
 
 ### Current Goal
